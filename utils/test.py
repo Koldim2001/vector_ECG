@@ -34,95 +34,18 @@ def discrete_signal_resample(signal, time, new_sampling_rate):
     return new_signal, new_time
 
 
-
-@click.command()
-@click.option(
-    "--data_edf",
-    default="Data VECG/ECG_1.edf",
-    help="Путь к файлу ЭКГ формата .edf",
-    type=str,
-)
-@click.option(
-    "--n_term_start",
-    default=3,
-    help="""Номер интересующего для анализа периода кардиоцикла.
-      Если необходимо построить результат за диапазон периодов, то данный 
-      параметр задает стартовое значение номера периода для записи вЭКГ
-      """,
-    type=int,
-)
-@click.option(
-    "--n_term_finish",
-    default=None,
-    help="""Параметр задается исключительно при необходимости построить диапазон периодов.
-      Значение является номером периода, до которого будет вестись запись вЭКГ (включительно)""",
-    type=int,
-)
-@click.option(
-    "--filt",
-    help="""Включение/выключение цифровой фильтрации исходных сигналов с помошью
-      фильтра Баттерворта 3 порядка (ФВЧ). По умолчанию фильтрация отключена""",
-    default=False,
-    type=bool,
-)
-@click.option(
-    "--f_sreza",
-    help="""Задание частоты среза ФВЧ фильтра. Используется исключительно при
-      выборе режима --filt=True. По умолчанию = 1 Гц""",
-    default=1.0,
-    type=float,
-)
-
-@click.option(
-    "--f_sampling",
-    help="""Задание частоты дискретизации. Будет проведено ресемплирование исходного
-      сигнла с использованием линейной инетрполяции. По умолчанию Fs=1500 Гц""",
-    default=1500.0,
-    type=float,
-)
-@click.option(
-    "--show_detected_pqrst",
-    help="""Включение/выключение режима для построения ключевых точек PQRST для сигнала ЭКГ,
-     полученных с помощью дискретных вейвлет преобразований. По умолчанию режим отключен""",
-    default=False,
-    type=bool,
-)
-@click.option(
-    "--show_ecg",
-    help="""Включение/выключение режима для построения графиков всех отведений и 
-      обнаруженных QRS пиков, относительно которых ведется подсчет номеров
-      n_term_start и n_term_finish. По умолчанию режим отключен""",
-    default=False,
-    type=bool,
-)
-@click.option(
-    "--plot_3d",
-    help="""Включение/выключение режима для интерактивного отображения 3D графика вЭКГ.
-    По умолчанию режим включен""",
-    default=True,
-    type=bool,
-)
-@click.option(
-    "--save_images",
-    help="""Включение/выключение режима для сохранения графиков вЭКГ трех
-      плоскостей в качестве png изображений. Сохранение производится в папку saved_vECG,
-      создающуюся в корне репозитория. Работает при отображении лишь одного 
-      периода кардиоцикла. По умолчанию режим По умолчанию режим отключен""",
-    default=False,
-    type=bool,
-)
-def main(**kwargs):
+def process(input : dict):
     # ------------------ ARG parse ------------------
-    data_edf = kwargs["data_edf"]
-    n_term_start = kwargs["n_term_start"]
-    n_term_finish = kwargs["n_term_finish"] 
-    filt = kwargs["filt"]
-    f_sreza = kwargs["f_sreza"]
-    Fs_new = kwargs["f_sampling"]
-    show_detect_pqrst = kwargs["show_detected_pqrst"]
-    show_ECG = kwargs["show_ecg"]
-    plot_3D = kwargs["plot_3d"]
-    save_images = kwargs["save_images"]
+    data_edf = input["data_edf"]
+    n_term_start = input["n_term_start"]
+    n_term_finish = input["n_term_finish"] 
+    filt = input["filt"]
+    f_sreza = input["f_sreza"]
+    Fs_new = input["f_sampling"]
+    show_detect_pqrst = input["show_detected_pqrst"]
+    show_ECG = input["show_ecg"]
+    plot_3D = input["plot_3d"]
+    save_images = input["save_images"]
 
 
     if n_term_finish != None:
