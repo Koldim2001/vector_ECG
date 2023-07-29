@@ -38,7 +38,7 @@ def discrete_signal_resample(signal, time, new_sampling_rate):
 @click.command()
 @click.option(
     "--data_edf",
-    default="Data VECG/ECG_1.edf",
+    default="Data_VECG/ECG_1.edf",
     help="Путь к файлу ЭКГ формата .edf",
     type=str,
 )
@@ -258,7 +258,6 @@ def main(**kwargs):
 
     df_term['size'] = 100
 
-    print('Результаты вычисления:')
     plt.figure(figsize=(7, 7), dpi=80)
     plt.plot(df_term.x,df_term.y)
     plt.title('Фронтальная плоскость')
