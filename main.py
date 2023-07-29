@@ -61,15 +61,15 @@ def discrete_signal_resample(signal, time, new_sampling_rate):
 @click.option(
     "--filt",
     help="""Включение/выключение цифровой фильтрации исходных сигналов с помошью
-      фильтра Баттерворта 3 порядка (ФВЧ). По умолчанию фильтрация отключена""",
+      фильтра Баттерворта 1 порядка (ФВЧ). По умолчанию фильтрация отключена""",
     default=False,
     type=bool,
 )
 @click.option(
     "--f_sreza",
     help="""Задание частоты среза ФВЧ фильтра. Используется исключительно при
-      выборе режима --filt=True. По умолчанию = 1 Гц""",
-    default=1.0,
+      выборе режима --filt=True. По умолчанию = 0.7 Гц""",
+    default=0.7,
     type=float,
 )
 
@@ -155,14 +155,14 @@ def main(**kwargs):
     for graph in channels:
         sig = np.array(df[graph])
         new_ecg, time_new = discrete_signal_resample(sig, t, Fs_new)
-        df_new[graph] = pd.Series(new_ecg)
+        df_new[graph] = pd.Series(new_ecg) 
     df = df_new.copy()
 
     if filt == True:
         df_new = pd.DataFrame()
         for graph in channels:
             sig = np.array(df[graph])
-            sos = scipy.signal.butter(3, f_sreza, 'hp', fs=Fs_new, output='sos')
+            sos = scipy.signal.butter(1, f_sreza, 'hp', fs=Fs_new, output='sos')
             avg = np.mean(sig)
             filtered = scipy.signal.sosfilt(sos, sig)
             filtered += avg
