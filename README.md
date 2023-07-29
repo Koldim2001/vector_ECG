@@ -24,7 +24,7 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf"
 ```
 Более тонкая настройка параметров:
 ```
-get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --filt=True --f_sreza=0.7 --f_sampling=2000 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --save_images=True
+get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --filt=True --f_sreza=0.5 --f_sampling=2000 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --save_images=True
 ```
 Список параметров с пояснениями, которые можно передать на вход программы ее перед запуском в cli:
 ```bash
@@ -39,10 +39,10 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --f
                                 вестись запись в ЭКГ (включительно)
 
 --filt BOOL                    Включение/выключение цифровой фильтрации исходных сигналов с помощью
-                               фильтра Баттерворта 3 порядка (ФВЧ). По умолчанию фильтрация отключена
+                               фильтра Баттерворта 1 порядка (ФВЧ). По умолчанию фильтрация отключена
 
 --f_sreza FLOAT                Задание частоты среза ФВЧ фильтра. Используется исключительно при 
-                               выборе режима --filt=True. По умолчанию = 1 Гц
+                               выборе режима --filt=True. По умолчанию = 0.7 Гц
 
 --f_sampling FLOAT             Задание частоты дискретизации. Будет проведено ресемплирование исходного
                                сигнала с использованием линейной интерполяции. По умолчанию Fs=1500 Гц
