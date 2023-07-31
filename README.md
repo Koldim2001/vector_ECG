@@ -26,7 +26,7 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf"
 ```
 get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --filt=True --f_sreza=0.5 --f_sampling=2000 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --save_images=True
 ```
-Список параметров с пояснениями, которые можно передать на вход программы ее перед запуском в cli:
+Список параметров с пояснениями, которые можно передать на вход программы перед ее запуском в cli:
 ```bash
 --data_edf TEXT                Путь к файлу ЭКГ формата .edf
 
