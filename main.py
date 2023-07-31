@@ -72,7 +72,6 @@ def discrete_signal_resample(signal, time, new_sampling_rate):
     default=0.7,
     type=float,
 )
-
 @click.option(
     "--f_sampling",
     help="""Задание частоты дискретизации. Будет проведено ресемплирование исходного
@@ -261,18 +260,26 @@ def main(**kwargs):
     plt.figure(figsize=(7, 7), dpi=80)
     plt.plot(df_term.x,df_term.y)
     plt.title('Фронтальная плоскость')
+    #plt.xlim([-0.0025, 0.001])
+    #plt.ylim([-0.001, 0.0012])
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.plot()
+
     plt.figure(figsize=(7, 7), dpi=80)
     plt.plot(df_term.y,df_term.z)
     plt.title('Сагитальная плоскость')
+    #plt.xlim([-0.001, 0.002])
+    #plt.ylim([-0.0015, 0.001])
     plt.xlabel('Y')
     plt.ylabel('Z')
     plt.plot()
+
     plt.figure(figsize=(7, 7), dpi=80)
     plt.plot(df_term.x, df_term.z)
     plt.title('Аксиальная плоскость')
+    #plt.xlim([-0.0025, 0.001])
+    #plt.ylim([-0.0013, 0.0008])    
     plt.xlabel('X')
     plt.ylabel('Z')
     plt.show()
@@ -299,6 +306,8 @@ def main(**kwargs):
 
         # После каждого plt.show() добавим код для сохранения графика в ЧБ формате
         plt.figure(figsize=(7, 7), dpi=80)
+        plt.xlim([-0.0025, 0.001])
+        plt.ylim([-0.001, 0.0012])
         plt.plot(df_term.x, df_term.y, color='black')
         plt.axis('off')  # Отключить оси и подписи
         name_save = 'saved_vECG/frontal_plane/' + name
@@ -306,6 +315,8 @@ def main(**kwargs):
         plt.close()
 
         plt.figure(figsize=(7, 7), dpi=80)
+        plt.xlim([-0.001, 0.002])
+        plt.ylim([-0.0015, 0.001])
         plt.plot(df_term.y, df_term.z, color='black')
         plt.axis('off')  # Отключить оси и подписи
         name_save = 'saved_vECG/sagittal_plane/' + name
@@ -313,6 +324,8 @@ def main(**kwargs):
         plt.close()
 
         plt.figure(figsize=(7, 7), dpi=80)
+        plt.xlim([-0.0025, 0.001])
+        plt.ylim([-0.0013, 0.0008])   
         plt.plot(df_term.x, df_term.z, color='black')
         plt.axis('off')  # Отключить оси и подписи
         name_save = 'saved_vECG/axial_plane/' + name
