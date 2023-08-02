@@ -19,14 +19,23 @@ pip install -e .
 
 ## Как запускать код:
 
-Классический подход c предустановленными параметрами:
+__Классический подход c предустановленными параметрами:__
 ```
 get_VECG --data_edf="Data_VECG\ECG_1.edf"
 ```
-Более тонкая настройка параметров:
+__Более тонкая настройка параметров:__
+
+Задание диапазона периодов ЭКГ для обработки:
 ```
-get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --filt=True --f_sreza=0.5 --f_sampling=2000 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --save_images=True --show_log_scaling=True
+get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --filt=True --f_sreza=0.5 --f_sampling=2000 --show_detected_pqrst=True --show_ecg=True --plot_3d=True
 ```
+
+Задание одного периода ЭКГ для обработки и сохранения результатов ВЭКГ в виде png файлов масштабированных проекций:
+```
+get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=4 --filt=True --f_sreza=0.5 --f_sampling=2500 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --save_images=True --show_log_scaling=True
+```
+
+
 Список параметров с пояснениями, которые можно передать на вход программы перед ее запуском в cli:
 ```bash
 --data_edf TEXT                Путь к файлу ЭКГ формата .edf
@@ -62,7 +71,7 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --f
 --save_images BOOL             Включение/выключение режима для сохранения графиков в ЭКГ трех плоскостей
                                в качестве png изображений. Сохранение производится в папку saved_vECG,
                                создающуюся в корне репозитория. Работает при отображении лишь одного
-                               периода кардиоцикла. По умолчанию режим отключен
+                               периода ЭКГ. По умолчанию режим отключен
 
 --show_log_scaling BOOL        Включение/выключение режима для демонстрации логов масштабирования
                                ВЭКГ для сохранения их как изображений с исходными пропорциями. Работает 
