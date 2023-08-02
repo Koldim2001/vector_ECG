@@ -40,8 +40,7 @@ def calculate_area(points):
     area_inside_loop = polygon.area
     return area_inside_loop
 
-
-def loop(df_term, name, show=False):
+def make_vecg(df_term):
     DI = df_term['ECG I']
     DII = df_term['ECG II']
     V1 = df_term['ECG V1']
@@ -54,6 +53,15 @@ def loop(df_term, name, show=False):
     df_term['x'] = -(-0.172*V1-0.074*V2+0.122*V3+0.231*V4+0.239*V5+0.194*V6+0.156*DI-0.01*DII)
     df_term['y'] = (0.057*V1-0.019*V2-0.106*V3-0.022*V4+0.041*V5+0.048*V6-0.227*DI+0.887*DII)
     df_term['z'] = -(-0.229*V1-0.31*V2-0.246*V3-0.063*V4+0.055*V5+0.108*V6+0.022*DI+0.102*DII)
+    return df_term
+
+    
+def loop(df_term, name, show=False):
+
+    if name == 'T':
+        name_loop = 'ST-T'
+    else:
+        name_loop = name
 
     if show:
         plt.figure(figsize=(15, 5), dpi=80)
@@ -75,44 +83,46 @@ def loop(df_term, name, show=False):
         plt.xlabel('X')
         plt.ylabel('Z')
 
-        plt.suptitle(f'{name} петля', fontsize=16)
+        plt.suptitle(f'{name_loop} петля', fontsize=16)
         plt.show()
     
     points = list(zip(df_term['x'], df_term['y']))
     area_inside_loop_1 = calculate_area(points)
-    print(f"Площадь петли {name} во фронтальной плоскости:", area_inside_loop_1)
+    print(f"Площадь петли {name_loop} во фронтальной плоскости:", area_inside_loop_1)
 
     points = list(zip(df_term['y'], df_term['z']))
     area_inside_loop_2 = calculate_area(points)
-    print(f"Площадь петли {name} в сагитальной плоскости:", area_inside_loop_2)
+    print(f"Площадь петли {name_loop} в сагитальной плоскости:", area_inside_loop_2)
 
     points = list(zip(df_term['x'], df_term['z']))
     area_inside_loop_3 = calculate_area(points)
-    print(f"Площадь петли {name} в аксиальной плоскости:", area_inside_loop_3)
+    print(f"Площадь петли {name_loop} в аксиальной плоскости:", area_inside_loop_3)
 
     return area_inside_loop_1, area_inside_loop_2, area_inside_loop_3
 
 
 def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
     area = []
+    # QRS петля
+    closest_Q_peak = min(waves_peak['ECG_Q_Peaks'], key=lambda x: abs(x - start))
+    closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
+    df_new = df.copy()
+    df_term = df_new.iloc[closest_Q_peak:closest_S_peak,:]
+    df_row = df_new.iloc[closest_Q_peak:closest_Q_peak+1,:]
+    df_term = pd.concat([df_term, df_row])
+    df_term = make_vecg(df_term)
     if QRS:
-        closest_Q_peak = min(waves_peak['ECG_Q_Peaks'], key=lambda x: abs(x - start))
-        closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
-        df_new = df.copy()
-        df_term = df_new.iloc[closest_Q_peak:closest_S_peak,:]
-        df_row = df_new.iloc[closest_Q_peak:closest_Q_peak+1,:]
-        df_term = pd.concat([df_term, df_row])
-
         area = list(loop(df_term, name='QRS', show=show))
 
+    # ST-T петля
+    closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
+    closest_T_end = min(waves_peak['ECG_T_Offsets'], key=lambda x: abs(x - closest_S_peak))
+    df_new = df.copy()
+    df_term = df_new.iloc[closest_S_peak + int(0.025*Fs_new) : closest_T_end, :]
+    df_row = df_new.iloc[closest_S_peak+int(0.025*Fs_new):closest_S_peak+int(0.025*Fs_new)+1,:]
+    df_term = pd.concat([df_term, df_row])
+    df_term = make_vecg(df_term)
     if T:
-        closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
-        closest_T_end = min(waves_peak['ECG_T_Offsets'], key=lambda x: abs(x - closest_S_peak))
-        df_new = df.copy()
-        df_term = df_new.iloc[closest_S_peak + int(0.025*Fs_new) : closest_T_end, :]
-        df_row = df_new.iloc[closest_S_peak+int(0.025*Fs_new):closest_S_peak+int(0.025*Fs_new)+1,:]
-        df_term = pd.concat([df_term, df_row])
-
         area.extend(list(loop(df_term, name='T', show=show)))
     return area
 
@@ -195,7 +205,7 @@ def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
 )
 @click.option(
     "--t_loop_area",
-    help="""Включение/выключение режима для расчета площади T петли по всем проекциям. 
+    help="""Включение/выключение режима для расчета площади ST-T петли по всем проекциям. 
     (PS: Рассчет является менее точным, чем QRS петли из-за множественных самопересечений)
     По умолчанию режим выключен""",
     default=False,
@@ -378,21 +388,10 @@ def main(**kwargs):
     df_term = df.iloc[start:end,:]
     df_row = df.iloc[start:start+1,:]
     df_term = pd.concat([df_term, df_row])
-    DI = df_term['ECG I']
-    DII = df_term['ECG II']
-    V1 = df_term['ECG V1']
-    V2 = df_term['ECG V2']
-    V3 = df_term['ECG V3']
-    V4 = df_term['ECG V4']
-    V5 = df_term['ECG V5']
-    V6 = df_term['ECG V6']
 
     # Расчет ВЭКГ
-    df_term['x'] = -(-0.172*V1-0.074*V2+0.122*V3+0.231*V4+0.239*V5+0.194*V6+0.156*DI-0.01*DII)
-    df_term['y'] = (0.057*V1-0.019*V2-0.106*V3-0.022*V4+0.041*V5+0.048*V6-0.227*DI+0.887*DII)
-    df_term['z'] = -(-0.229*V1-0.31*V2-0.246*V3-0.063*V4+0.055*V5+0.108*V6+0.022*DI+0.102*DII)
-
-    df_term['size'] = 100
+    df_term = make_vecg(df_term)
+    df_term['size'] = 100 # задание размера для 3D визуализации
 
     # Построение проекций ВЭКГ:
     if not cancel_showing:

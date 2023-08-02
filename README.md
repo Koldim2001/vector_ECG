@@ -32,7 +32,7 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --f
 
 Задание одного периода ЭКГ для обработки и сохранения результатов ВЭКГ в виде png файлов масштабированных проекций:
 ```
-get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=4 --filt=True --f_sreza=0.5 --f_sampling=2500 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --save_images=True --show_log_scaling=True
+get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=3 --filt=True --f_sreza=0.5 --f_sampling=2500 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --qrs_loop_area=True --t_loop_area=True --show_log_loop_area=True --save_images=True --show_log_scaling=True
 ```
 
 
@@ -71,7 +71,7 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=4 --filt=True --f_sreza
 --qrs_loop_area BOOL           Включение/выключение режима для расчета площади QRS петли по 
                                всем проекциям. По умолчанию режим включен                         
 
---t_loop_area BOOL             Включение/выключение режима для расчета площади T петли по всем 
+--t_loop_area BOOL             Включение/выключение режима для расчета площади ST-T петли по всем 
                                проекциям.  (PS: Рассчет является менее точным, чем QRS петли из-за 
                                множественных самопересечений) По  умолчанию режим выключен
                                 

@@ -53,6 +53,10 @@ def loop(df_term, name, show=False):
     df_term['x'] = -(-0.172*V1-0.074*V2+0.122*V3+0.231*V4+0.239*V5+0.194*V6+0.156*DI-0.01*DII)
     df_term['y'] = (0.057*V1-0.019*V2-0.106*V3-0.022*V4+0.041*V5+0.048*V6-0.227*DI+0.887*DII)
     df_term['z'] = -(-0.229*V1-0.31*V2-0.246*V3-0.063*V4+0.055*V5+0.108*V6+0.022*DI+0.102*DII)
+    if name == 'T':
+        name_loop = 'ST-T'
+    else:
+        name_loop = name
 
     if show:
         plt.figure(figsize=(15, 5), dpi=80)
@@ -74,20 +78,20 @@ def loop(df_term, name, show=False):
         plt.xlabel('X')
         plt.ylabel('Z')
 
-        plt.suptitle(f'{name} петля', fontsize=16)
+        plt.suptitle(f'{name_loop} петля', fontsize=16)
         plt.show()
     
     points = list(zip(df_term['x'], df_term['y']))
     area_inside_loop_1 = calculate_area(points)
-    print(f"Площадь петли {name} во фронтальной плоскости:", area_inside_loop_1)
+    print(f"Площадь петли {name_loop} во фронтальной плоскости:", area_inside_loop_1)
 
     points = list(zip(df_term['y'], df_term['z']))
     area_inside_loop_2 = calculate_area(points)
-    print(f"Площадь петли {name} в сагитальной плоскости:", area_inside_loop_2)
+    print(f"Площадь петли {name_loop} в сагитальной плоскости:", area_inside_loop_2)
 
     points = list(zip(df_term['x'], df_term['z']))
     area_inside_loop_3 = calculate_area(points)
-    print(f"Площадь петли {name} в аксиальной плоскости:", area_inside_loop_3)
+    print(f"Площадь петли {name_loop} в аксиальной плоскости:", area_inside_loop_3)
 
     return area_inside_loop_1, area_inside_loop_2, area_inside_loop_3
 
