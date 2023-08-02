@@ -9,6 +9,8 @@ import scipy.signal
 import neurokit2 as nk
 import plotly.express as px
 from shapely.geometry import Polygon
+import plotly.graph_objects as go
+import click
 
 
 def rename_columns(df):
@@ -21,6 +23,7 @@ def rename_columns(df):
 
 
 def discrete_signal_resample(signal, time, new_sampling_rate):
+    ## Производит ресемплирование
     # Текущая частота дискретизации
     current_sampling_rate = 1 / np.mean(np.diff(time))
 
@@ -35,12 +38,41 @@ def discrete_signal_resample(signal, time, new_sampling_rate):
 
 
 def calculate_area(points):
+    # Считает площадь замкнутого полигона
     polygon = Polygon(points)
     area_inside_loop = polygon.area
     return area_inside_loop
 
 
-def loop(df_term, name, show=False):
+def find_mean(df_term):
+    # Считает средние значения петель
+    x_center = df_term.x.mean()
+    y_center = df_term.y.mean()
+    z_center = df_term.z.mean()
+    return [x_center, y_center, z_center]
+
+
+def find_qrst_angle(mean_qrs, mean_t, name=''):
+    ## Находит угол QRST с помощью скалярного произведения
+    # Преобразуем списки в numpy массивы
+    mean_qrs = np.array(mean_qrs)
+    mean_t = np.array(mean_t)
+
+    # Находим угол между векторами в радианах
+    dot_product = np.dot(mean_qrs, mean_t)
+    norm_qrs = np.linalg.norm(mean_qrs)
+    norm_t = np.linalg.norm(mean_t)
+    angle_radians = np.arccos(dot_product / (norm_qrs * norm_t))
+
+    # Конвертируем угол из радиан в градусы
+    angle_degrees = np.degrees(angle_radians)
+    print(f"Угол QRST {name}равен {round(angle_degrees, 2)} градусов")
+
+    return angle_degrees
+
+
+def make_vecg(df_term):
+    # Получает значения ВЭКГ из ЭКГ
     DI = df_term['ECG I']
     DII = df_term['ECG II']
     V1 = df_term['ECG V1']
@@ -53,6 +85,11 @@ def loop(df_term, name, show=False):
     df_term['x'] = -(-0.172*V1-0.074*V2+0.122*V3+0.231*V4+0.239*V5+0.194*V6+0.156*DI-0.01*DII)
     df_term['y'] = (0.057*V1-0.019*V2-0.106*V3-0.022*V4+0.041*V5+0.048*V6-0.227*DI+0.887*DII)
     df_term['z'] = -(-0.229*V1-0.31*V2-0.246*V3-0.063*V4+0.055*V5+0.108*V6+0.022*DI+0.102*DII)
+    return df_term
+
+    
+def loop(df_term, name, show=False):
+    # Подсчет и отображение площади петли
     if name == 'T':
         name_loop = 'ST-T'
     else:
@@ -97,27 +134,97 @@ def loop(df_term, name, show=False):
 
 
 def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
+    # Выделяет области петель для дальнейшей обработки - подсчета угла QRST и площадей
     area = []
+    # QRS петля
+    closest_Q_peak = min(waves_peak['ECG_Q_Peaks'], key=lambda x: abs(x - start))
+    closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
+    df_new = df.copy()
+    df_term = df_new.iloc[closest_Q_peak:closest_S_peak,:]
+    df_row = df_new.iloc[closest_Q_peak:closest_Q_peak+1,:]
+    df_term = pd.concat([df_term, df_row])
+    df_term = make_vecg(df_term)
+    mean_qrs = find_mean(df_term)
     if QRS:
-        closest_Q_peak = min(waves_peak['ECG_Q_Peaks'], key=lambda x: abs(x - start))
-        closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
-        df_new = df.copy()
-        df_term = df_new.iloc[closest_Q_peak:closest_S_peak,:]
-        df_row = df_new.iloc[closest_Q_peak:closest_Q_peak+1,:]
-        df_term = pd.concat([df_term, df_row])
-
         area = list(loop(df_term, name='QRS', show=show))
 
+    # ST-T петля
+    closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
+    closest_T_end = min(waves_peak['ECG_T_Offsets'], key=lambda x: abs(x - closest_S_peak))
+    df_new = df.copy()
+    df_term = df_new.iloc[closest_S_peak + int(0.025*Fs_new) : closest_T_end, :]
+    df_row = df_new.iloc[closest_S_peak+int(0.025*Fs_new):closest_S_peak+int(0.025*Fs_new)+1,:]
+    df_term = pd.concat([df_term, df_row])
+    df_term = make_vecg(df_term)
+    mean_t = find_mean(df_term)
     if T:
-        closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
-        closest_T_end = min(waves_peak['ECG_T_Offsets'], key=lambda x: abs(x - closest_S_peak))
-        df_new = df.copy()
-        df_term = df_new.iloc[closest_S_peak + int(0.025*Fs_new) : closest_T_end, :]
-        df_row = df_new.iloc[closest_S_peak+int(0.025*Fs_new):closest_S_peak+int(0.025*Fs_new)+1,:]
-        df_term = pd.concat([df_term, df_row])
-
         area.extend(list(loop(df_term, name='T', show=show)))
-    return area
+    return area, mean_qrs, mean_t
+
+
+def preprocessing_3d(list_coord):
+    # Строит линии на 3D графике, отвечающие за вектора средних ЭДС петель
+    A = np.array(list_coord)
+
+    step = 0.05
+    # Создаем массив точек от (0, 0, 0) до точки A с заданным шагом
+    interpolated_points = []
+    for t in np.arange(0, 1, step):
+        interpolated_point = t * A
+        interpolated_points.append(interpolated_point)
+
+    # Добавляем точку A в конец массива
+    interpolated_points.append(A)
+
+    # Преобразуем список точек в numpy массив
+    interpolated_points = np.array(interpolated_points)
+
+    df = pd.DataFrame(interpolated_points, columns=['x', 'y', 'z'])
+    df['s']=20 # задали размер для 3D отображения
+    return df
+
+
+def angle_3d_plot(df1, df2, df3):
+    # Построение интерактивного графика логов вычисления угла QRST 
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter3d(
+            x=df1['x'],
+            y=df1['y'],
+            z=df1['z'],
+            mode='markers',
+            marker=dict(size=df1['s'], sizemode='diameter', opacity=1),
+            name='Средняя электродвижущая сила QRS'
+        )
+    )
+    fig.add_trace(
+        go.Scatter3d(
+            x=df2['x'],
+            y=df2['y'],
+            z=df2['z'],
+            mode='markers',
+            marker=dict(size=df2['s'], sizemode='diameter', opacity=1),
+            name='Средняя электродвижущая сила ST-T'
+        )
+    )
+    df3['size'] = 10
+    fig.add_trace(
+        go.Scatter3d(
+            x=df3['x'],
+            y=df3['y'],
+            z=df3['z'],
+            mode='markers',
+            marker=dict(size=df3['size'], sizemode='diameter', opacity=1),
+            name='ВЭКГ'
+        )
+    )
+    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+    fig.show()
+
+
+
+#---------------------------------------------------------------------#
 
 def process(input : dict):
     data_edf = input["data_edf"]
@@ -135,6 +242,13 @@ def process(input : dict):
     QRS_loop_area = input["qrs_loop_area"]
     T_loop_area = input["t_loop_area"]
     show_log_loop_area = input["show_log_loop_area"]
+    count_qrst_angle = input["count_qrst_angle"]
+    show_log_qrst_angle = input["show_log_qrst_angle"]
+
+
+    area_projections = None
+    angle_qrst = None
+    angle_qrst_front = None
 
     if cancel_showing:
         show_detect_pqrst = False
@@ -142,6 +256,7 @@ def process(input : dict):
         plot_3D = False
         show_log_scaling = False
         show_log_loop_area = False
+        show_log_qrst_angle = False
 
     if n_term_finish != None:
         if n_term_finish < n_term_start:
@@ -160,10 +275,12 @@ def process(input : dict):
     df = pd.DataFrame(data=raw_data.T,    # values
                 index=range(raw_data.shape[1]),  # 1st column as index
                 columns=channels)  # 1st row as the column names
+    # Переименование столбцов при необходимости:
     if 'ECG I-Ref' in df.columns:
         df = rename_columns(df)
         channels = df.columns
-        
+
+    # Создание массива времени    
     Ts = 1/fd
     t = []
     for i in range(raw_data.shape[1]):
@@ -208,13 +325,17 @@ def process(input : dict):
                 for peak in peaks:
                     if not np.isnan(peak):  # Проверяем, что значение точки не является NaN
                         if wave_type == 'ECG_P_Peaks':
-                            plt.axvline(x=time_new[int(peak)], linestyle='dotted', color='red', label=f'{wave_type_label} Peak')
+                            plt.axvline(x=time_new[int(peak)], linestyle='dotted',
+                                        color='red', label=f'{wave_type_label} Peak')
                         elif wave_type == 'ECG_Q_Peaks':
-                            plt.axvline(x=time_new[int(peak)], linestyle='dotted', color='green', label=f'{wave_type_label} Peak')
+                            plt.axvline(x=time_new[int(peak)], linestyle='dotted',
+                                        color='green', label=f'{wave_type_label} Peak')
                         elif wave_type == 'ECG_S_Peaks': 
-                            plt.axvline(x=time_new[int(peak)], linestyle='dotted', color='m', label=f'{wave_type_label} Peak')
+                            plt.axvline(x=time_new[int(peak)], linestyle='dotted',
+                                        color='m', label=f'{wave_type_label} Peak')
                         else:  
-                            plt.axvline(x=time_new[int(peak)], linestyle='dotted', color='blue', label=f'{wave_type_label} Peak')
+                            plt.axvline(x=time_new[int(peak)], linestyle='dotted',
+                                        color='blue', label=f'{wave_type_label} Peak')
 
         plt.xlim([0, 6])
         plt.xlabel('Time (seconds)')
@@ -234,7 +355,8 @@ def process(input : dict):
             sig = np.array(df[graph])
 
             axs[row, col].plot(time_new, sig)
-            axs[row, col].scatter(time_new[rpeaks['ECG_R_Peaks']], sig[rpeaks['ECG_R_Peaks']], color='red')
+            axs[row, col].scatter(time_new[rpeaks['ECG_R_Peaks']], 
+                                  sig[rpeaks['ECG_R_Peaks']], color='red')
             axs[row, col].set_title(graph)
             axs[row, col].set_xlim([0, 6])
             axs[row, col].set_title(graph)
@@ -243,7 +365,7 @@ def process(input : dict):
         plt.tight_layout()
         plt.show()
 
-    # ВЫбор исследуемого периода/периодов
+    # Выбор исследуемого периода/периодов
     i = n_term
     if type(i) == list:
         print(f"Запрошен диапазон с {i[0]} по {i[1]} период включительно")
@@ -259,21 +381,10 @@ def process(input : dict):
     df_term = df.iloc[start:end,:]
     df_row = df.iloc[start:start+1,:]
     df_term = pd.concat([df_term, df_row])
-    DI = df_term['ECG I']
-    DII = df_term['ECG II']
-    V1 = df_term['ECG V1']
-    V2 = df_term['ECG V2']
-    V3 = df_term['ECG V3']
-    V4 = df_term['ECG V4']
-    V5 = df_term['ECG V5']
-    V6 = df_term['ECG V6']
 
     # Расчет ВЭКГ
-    df_term['x'] = -(-0.172*V1-0.074*V2+0.122*V3+0.231*V4+0.239*V5+0.194*V6+0.156*DI-0.01*DII)
-    df_term['y'] = (0.057*V1-0.019*V2-0.106*V3-0.022*V4+0.041*V5+0.048*V6-0.227*DI+0.887*DII)
-    df_term['z'] = -(-0.229*V1-0.31*V2-0.246*V3-0.063*V4+0.055*V5+0.108*V6+0.022*DI+0.102*DII)
-
-    df_term['size'] = 100
+    df_term = make_vecg(df_term)
+    df_term['size'] = 100 # задание размера для 3D визуализации
 
     # Построение проекций ВЭКГ:
     if not cancel_showing:
@@ -300,10 +411,9 @@ def process(input : dict):
     # Интерактивное 3D отображение
     if plot_3D:
         fig = px.scatter_3d(df_term, x='x', y='y', z='z', size='size', size_max=10, opacity=1)
-        # tight layout
         fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
         fig.show()
-    area = None
+
     # Работа при указании одного периода ЭКГ: 
     if  n_term_finish == None or n_term_finish == n_term_start:
         ## Масштабирование:
@@ -317,7 +427,9 @@ def process(input : dict):
         df_term['z_scaled'] = df_term.z - z_center
 
         # Нормирование на максимальное значение 
-        max_value = max(df_term['x_scaled'].abs().max(), df_term['y_scaled'].abs().max(), df_term['z_scaled'].abs().max())
+        max_value = max(df_term['x_scaled'].abs().max(),
+                        df_term['y_scaled'].abs().max(),
+                        df_term['z_scaled'].abs().max())
         df_term['x_scaled'] = df_term['x_scaled'] / max_value
         df_term['y_scaled'] = df_term['y_scaled'] / max_value
         df_term['z_scaled'] = df_term['z_scaled'] / max_value
@@ -377,9 +489,21 @@ def process(input : dict):
             plt.show()
 
         # Поиск площадей при задании на исследование одного периодка ЭКГ:
-        area = get_area(show=show_log_loop_area, df=df, waves_peak=waves_peak,
-                         start=start, Fs_new=Fs_new,  QRS=QRS_loop_area, T=T_loop_area)
-        
+        area_projections , mean_qrs, mean_t = get_area(show=show_log_loop_area, df=df,
+                                                       waves_peak=waves_peak, start=start,
+                                                       Fs_new=Fs_new,  QRS=QRS_loop_area, 
+                                                       T=T_loop_area)
+        # Определение угла QRST:
+        if count_qrst_angle:
+            angle_qrst = find_qrst_angle(mean_qrs, mean_t)
+            angle_qrst_front = find_qrst_angle(mean_qrs[:2], mean_t[:2],
+                                               name='во фронтальной плоскости ')
+
+            # Отображение трехмерного угла QRST
+            if show_log_qrst_angle:
+                df_qrs = preprocessing_3d(mean_qrs)
+                df_t = preprocessing_3d(mean_t)
+                angle_3d_plot(df_qrs, df_t, df_term)
 
     # Сохранение масштабированных изображений
     if save_images and (n_term_finish == None or n_term_finish == n_term_start):
@@ -424,8 +548,7 @@ def process(input : dict):
         plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
         plt.close()
         print('Фотографии сохранены в папке saved_vECG')
-
-    return area
+    return  area_projections, angle_qrst, angle_qrst_front
 
 
 

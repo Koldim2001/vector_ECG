@@ -23,6 +23,7 @@ def rename_columns(df):
 
 
 def discrete_signal_resample(signal, time, new_sampling_rate):
+    ## Производит ресемплирование
     # Текущая частота дискретизации
     current_sampling_rate = 1 / np.mean(np.diff(time))
 
@@ -37,12 +38,14 @@ def discrete_signal_resample(signal, time, new_sampling_rate):
 
 
 def calculate_area(points):
+    # Считает площадь замкнутого полигона
     polygon = Polygon(points)
     area_inside_loop = polygon.area
     return area_inside_loop
 
 
 def find_mean(df_term):
+    # Считает средние значения петель
     x_center = df_term.x.mean()
     y_center = df_term.y.mean()
     z_center = df_term.z.mean()
@@ -50,6 +53,7 @@ def find_mean(df_term):
 
 
 def find_qrst_angle(mean_qrs, mean_t, name=''):
+    ## Находит угол QRST с помощью скалярного произведения
     # Преобразуем списки в numpy массивы
     mean_qrs = np.array(mean_qrs)
     mean_t = np.array(mean_t)
@@ -68,6 +72,7 @@ def find_qrst_angle(mean_qrs, mean_t, name=''):
 
 
 def make_vecg(df_term):
+    # Получает значения ВЭКГ из ЭКГ
     DI = df_term['ECG I']
     DII = df_term['ECG II']
     V1 = df_term['ECG V1']
@@ -84,7 +89,7 @@ def make_vecg(df_term):
 
     
 def loop(df_term, name, show=False):
-
+    # Подсчет и отображение площади петли
     if name == 'T':
         name_loop = 'ST-T'
     else:
@@ -129,6 +134,7 @@ def loop(df_term, name, show=False):
 
 
 def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
+    # Выделяет области петель для дальнейшей обработки - подсчета угла QRST и площадей
     area = []
     # QRS петля
     closest_Q_peak = min(waves_peak['ECG_Q_Peaks'], key=lambda x: abs(x - start))
@@ -157,10 +163,10 @@ def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
 
 
 def preprocessing_3d(list_coord):
+    # Строит линии на 3D графике, отвечающие за вектора средних ЭДС петель
     A = np.array(list_coord)
-    # Шаг интерполяции
-    step = 0.01
 
+    step = 0.025
     # Создаем массив точек от (0, 0, 0) до точки A с заданным шагом
     interpolated_points = []
     for t in np.arange(0, 1, step):
@@ -174,11 +180,12 @@ def preprocessing_3d(list_coord):
     interpolated_points = np.array(interpolated_points)
 
     df = pd.DataFrame(interpolated_points, columns=['x', 'y', 'z'])
-    df['s']=20
+    df['s']=20 # задали размер для 3D отображения
     return df
 
 
 def angle_3d_plot(df1, df2, df3):
+    # Построение интерактивного графика логов вычисления угла QRST 
     fig = go.Figure()
 
     fig.add_trace(
@@ -191,7 +198,6 @@ def angle_3d_plot(df1, df2, df3):
             name='Средняя электродвижущая сила QRS'
         )
     )
-
     fig.add_trace(
         go.Scatter3d(
             x=df2['x'],
@@ -213,7 +219,6 @@ def angle_3d_plot(df1, df2, df3):
             name='ВЭКГ'
         )
     )
-
     fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
     fig.show()
 
@@ -294,13 +299,14 @@ def angle_3d_plot(df1, df2, df3):
 @click.option(
     "--qrs_loop_area",
     help="""Включение/выключение режима для расчета площади QRS петли по всем проекциям.
-    По умолчанию режим включен""",
+    Работает при отображении лишь одного периода ЭКГ. По умолчанию режим включен""",
     default=True,
     type=bool,
 )
 @click.option(
     "--t_loop_area",
     help="""Включение/выключение режима для расчета площади ST-T петли по всем проекциям. 
+    Работает при отображении лишь одного периода ЭКГ.
     (PS: Рассчет является менее точным, чем QRS петли из-за множественных 
     самопересечений) По умолчанию режим выключен""",
     default=False,
@@ -311,6 +317,21 @@ def angle_3d_plot(df1, df2, df3):
     help="""Включение/выключение режима для отображения отдельных петель. Доступен при
     включенной опции расчета площади какой-либо петли QRS_loop_area или T_loop_area
     По умолчанию режим выключен""",
+    default=False,
+    type=bool,
+)
+@click.option(
+    "--count_qrst_angle",
+    help="""Включение/выключение режима для вычисления пространственного угла QRST,
+      а также проекции угла на фронтальную плоскость. Работает 
+      при отображении лишь одного периода ЭКГ. По умолчанию режим включен""",
+    default=True,
+    type=bool,
+)
+@click.option(
+    "--show_log_qrst_angle",
+    help="""Включение/выключение режима для трехмерного отображения угла QRST на ВЭКГ.
+      Работает при count_qrst_angle=True. По умолчанию режим выключен""",
     default=False,
     type=bool,
 )
@@ -357,6 +378,8 @@ def main(**kwargs):
     QRS_loop_area = kwargs["qrs_loop_area"]
     T_loop_area = kwargs["t_loop_area"]
     show_log_loop_area = kwargs["show_log_loop_area"]
+    count_qrst_angle = kwargs["count_qrst_angle"]
+    show_log_qrst_angle = kwargs["show_log_qrst_angle"]
 
     if cancel_showing:
         show_detect_pqrst = False
@@ -364,6 +387,7 @@ def main(**kwargs):
         plot_3D = False
         show_log_scaling = False
         show_log_loop_area = False
+        show_log_qrst_angle = False
 
     if n_term_finish != None:
         if n_term_finish < n_term_start:
@@ -600,8 +624,6 @@ def main(**kwargs):
                                                        waves_peak=waves_peak, start=start,
                                                        Fs_new=Fs_new,  QRS=QRS_loop_area, 
                                                        T=T_loop_area)
-        count_qrst_angle = True
-        qrst_angle_show_log = True
         # Определение угла QRST:
         if count_qrst_angle:
             angle_qrst = find_qrst_angle(mean_qrs, mean_t)
@@ -609,7 +631,7 @@ def main(**kwargs):
                                                name='во фронтальной плоскости ')
 
             # Отображение трехмерного угла QRST
-            if qrst_angle_show_log:
+            if show_log_qrst_angle:
                 df_qrs = preprocessing_3d(mean_qrs)
                 df_t = preprocessing_3d(mean_t)
                 angle_3d_plot(df_qrs, df_t, df_term)
