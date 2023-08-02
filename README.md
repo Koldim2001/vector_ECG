@@ -32,7 +32,7 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --f
 
 Задание одного периода ЭКГ для обработки и сохранения результатов ВЭКГ в виде png файлов масштабированных проекций:
 ```
-get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=3 --filt=True --f_sreza=0.5 --f_sampling=2500 --show_detected_pqrst=False --show_ecg=False --plot_3d=True --qrs_loop_area=False --t_loop_area=False --show_log_loop_area=False --count_qrst_angle=False --show_log_qrst_angle=False --save_images=True --show_log_scaling=True
+get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=3 --filt=True --f_sreza=0.5 --f_sampling=2500 --show_detected_pqrst=False --show_ecg=False --plot_3d=False --qrs_loop_area=False --t_loop_area=False --show_log_loop_area=False --count_qrst_angle=False --show_log_qrst_angle=False --save_images=True --show_log_scaling=True
 ```
 Задание одного периода ЭКГ для обработки c выводом всех логов и найденных углов с площадями:
 ```
