@@ -106,7 +106,24 @@ def discrete_signal_resample(signal, time, new_sampling_rate):
     help="""Включение/выключение режима для сохранения графиков вЭКГ трех
       плоскостей в качестве png изображений. Сохранение производится в папку saved_vECG,
       создающуюся в корне репозитория. Работает при отображении лишь одного 
-      периода кардиоцикла. По умолчанию режим По умолчанию режим отключен""",
+      периода ЭКГ. По умолчанию режим отключен""",
+    default=False,
+    type=bool,
+)
+@click.option(
+    "--show_log_scaling",
+    help="""Включение/выключение режима для демонстрации логов масштабирования
+      ВЭКГ для сохранения их как изображений с исходными пропорциями. Работает 
+      при отображении лишь одного периода ЭКГ. По умолчанию режим отключен.""",
+    default=False,
+    type=bool,
+)
+@click.option(
+    "--cancel_showing",
+    help="""Включение/выключение режима для вывода любых графиков. Позволяет
+      выключить отображение графических результатов для возможности
+      использовать get_VECG в цикле по файлам ЭКГ. По умолчанию режим 
+      отключен (то есть отображение графиков включено).""",
     default=False,
     type=bool,
 )
@@ -122,7 +139,14 @@ def main(**kwargs):
     show_ECG = kwargs["show_ecg"]
     plot_3D = kwargs["plot_3d"]
     save_images = kwargs["save_images"]
+    show_log_scaling = kwargs["show_log_scaling"]
+    cancel_showing = kwargs["cancel_showing"]
 
+    if cancel_showing:
+        show_detect_pqrst = False
+        show_ECG = False
+        plot_3D = False
+        show_log_scaling = False
 
     if n_term_finish != None:
         if n_term_finish < n_term_start:
@@ -257,29 +281,26 @@ def main(**kwargs):
 
     df_term['size'] = 100
 
-    plt.figure(figsize=(15, 5), dpi=100)
-    plt.subplot(1, 3, 1)
-    plt.plot(df_term.x,df_term.y)
-    plt.title('Фронтальная плоскость')
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    #plt.plot()
+    if not cancel_showing:
+        plt.figure(figsize=(15, 5), dpi=100)
+        plt.subplot(1, 3, 1)
+        plt.plot(df_term.x,df_term.y)
+        plt.title('Фронтальная плоскость')
+        plt.xlabel('X')
+        plt.ylabel('Y')
 
-    #plt.figure(figsize=(7, 7), dpi=80)
-    plt.subplot(1, 3, 2)
-    plt.plot(df_term.y,df_term.z)
-    plt.title('Сагитальная плоскость')
-    plt.xlabel('Y')
-    plt.ylabel('Z')
-    #plt.plot()
+        plt.subplot(1, 3, 2)
+        plt.plot(df_term.y,df_term.z)
+        plt.title('Сагитальная плоскость')
+        plt.xlabel('Y')
+        plt.ylabel('Z')
 
-    #plt.figure(figsize=(7, 7), dpi=80)
-    plt.subplot(1, 3, 3)
-    plt.plot(df_term.x, df_term.z)
-    plt.title('Аксиальная плоскость')  
-    plt.xlabel('X')
-    plt.ylabel('Z')
-    plt.show()
+        plt.subplot(1, 3, 3)
+        plt.plot(df_term.x, df_term.z)
+        plt.title('Аксиальная плоскость')  
+        plt.xlabel('X')
+        plt.ylabel('Z')
+        plt.show()
 
     if plot_3D:
         fig = px.scatter_3d(df_term, x='x', y='y', z='z', size='size', size_max=10, opacity=1)
@@ -287,7 +308,77 @@ def main(**kwargs):
         fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
         fig.show()
 
-    if save_images and n_term_finish == None:
+    if  n_term_finish == None or n_term_finish == n_term_start:
+        # Поиск центра масс:
+        x_center = df_term.x.mean()
+        y_center = df_term.y.mean()
+        z_center = df_term.z.mean()
+
+        df_term['x_scaled'] = df_term.x - x_center
+        df_term['y_scaled'] = df_term.y - y_center
+        df_term['z_scaled'] = df_term.z - z_center
+
+        # Нормирование на максимальное значение 
+        max_value = max(df_term['x_scaled'].abs().max(), df_term['y_scaled'].abs().max(), df_term['z_scaled'].abs().max())
+        df_term['x_scaled'] = df_term['x_scaled'] / max_value
+        df_term['y_scaled'] = df_term['y_scaled'] / max_value
+        df_term['z_scaled'] = df_term['z_scaled'] / max_value
+
+        if show_log_scaling:
+            plt.figure(figsize=(8, 10), dpi=80)
+            plt.subplot(3, 2, 1)
+            plt.plot(df_term.x, df_term.y)
+            plt.title('Исходные проекции')
+            plt.xlabel('X')
+            plt.ylabel('Y') 
+            plt.plot(x_center, y_center, marker='*', markersize=11, label='Центр масс', color='red')
+            plt.grid(True)
+            plt.legend()
+
+            plt.subplot(3, 2, 2)
+            plt.plot(df_term.x_scaled, df_term.y_scaled)
+            plt.title('Масштабированные проекции')
+            plt.xlabel('X')
+            plt.ylabel('Y') 
+            plt.xlim([-1.05, 1.05])
+            plt.ylim([-1.05, 1.05])
+            plt.grid(True)
+
+            plt.subplot(3, 2, 3)
+            plt.plot(df_term.y, df_term.z)
+            plt.xlabel('Y')
+            plt.ylabel('Z')
+            plt.plot(y_center, z_center, marker='*', markersize=11, label='Центр масс', color='red')
+            plt.grid(True)
+            plt.legend()
+
+            plt.subplot(3, 2, 4)
+            plt.plot(df_term.y_scaled, df_term.z_scaled)
+            plt.xlim([-1.05, 1.05])
+            plt.ylim([-1.05, 1.05])
+            plt.xlabel('Y')
+            plt.ylabel('Z')
+            plt.grid(True)
+
+            plt.subplot(3, 2, 5)
+            plt.plot(df_term.x, df_term.z)
+            plt.xlabel('X')
+            plt.ylabel('Z')
+            plt.plot(x_center, z_center, marker='*', markersize=12, label='Центр масс', color='red')
+            plt.grid(True)
+            plt.legend()
+
+            plt.subplot(3, 2, 6)
+            plt.plot(df_term.x_scaled, df_term.z_scaled)
+            plt.xlabel('X')
+            plt.ylabel('Z')
+            plt.xlim([-1.05, 1.05])
+            plt.ylim([-1.05, 1.05])
+            plt.grid(True)
+            plt.show()
+
+
+    if save_images and (n_term_finish == None or n_term_finish == n_term_start):
         file_name_without_extension = os.path.splitext(os.path.basename(data_edf))[0]
         name = f'{file_name_without_extension}_period_{n_term_start}.png'
         
@@ -302,28 +393,28 @@ def main(**kwargs):
             os.makedirs('saved_vECG/axial_plane')      
 
         # После каждого plt.show() добавим код для сохранения графика в ЧБ формате
-        plt.figure(figsize=(7, 7), dpi=80)
-        plt.xlim([-0.0025, 0.001])
-        plt.ylim([-0.001, 0.0012])
-        plt.plot(df_term.x, df_term.y, color='black')
+        plt.figure(figsize=(7, 7), dpi=150)
+        plt.xlim([-1.03, 1.03])
+        plt.ylim([-1.03, 1.03])
+        plt.plot(df_term.x_scaled, df_term.y_scaled, color='black')
         plt.axis('off')  # Отключить оси и подписи
         name_save = 'saved_vECG/frontal_plane/' + name
         plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
         plt.close()
 
-        plt.figure(figsize=(7, 7), dpi=80)
-        plt.xlim([-0.001, 0.002])
-        plt.ylim([-0.0015, 0.001])
-        plt.plot(df_term.y, df_term.z, color='black')
+        plt.figure(figsize=(7, 7), dpi=150)
+        plt.xlim([-1.03, 1.03])
+        plt.ylim([-1.03, 1.03])
+        plt.plot(df_term.y_scaled, df_term.z_scaled, color='black')
         plt.axis('off')  # Отключить оси и подписи
         name_save = 'saved_vECG/sagittal_plane/' + name
         plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
         plt.close()
 
-        plt.figure(figsize=(7, 7), dpi=80)
-        plt.xlim([-0.0025, 0.001])
-        plt.ylim([-0.0013, 0.0008])   
-        plt.plot(df_term.x, df_term.z, color='black')
+        plt.figure(figsize=(7, 7), dpi=150)
+        plt.xlim([-1.03, 1.03])
+        plt.ylim([-1.03, 1.03])  
+        plt.plot(df_term.x_scaled, df_term.z_scaled, color='black')
         plt.axis('off')  # Отключить оси и подписи
         name_save = 'saved_vECG/axial_plane/' + name
         plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
