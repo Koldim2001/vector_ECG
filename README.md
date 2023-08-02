@@ -25,7 +25,7 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf"
 ```
 Более тонкая настройка параметров:
 ```
-get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --filt=True --f_sreza=0.5 --f_sampling=2000 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --save_images=True
+get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --filt=True --f_sreza=0.5 --f_sampling=2000 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --save_images=True --show_log_scaling=True
 ```
 Список параметров с пояснениями, которые можно передать на вход программы перед ее запуском в cli:
 ```bash
