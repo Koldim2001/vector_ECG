@@ -277,10 +277,12 @@ def main(**kwargs):
     df = pd.DataFrame(data=raw_data.T,    # values
                 index=range(raw_data.shape[1]),  # 1st column as index
                 columns=channels)  # 1st row as the column names
+    # Переименование столбцов при необходимости:
     if 'ECG I-Ref' in df.columns:
         df = rename_columns(df)
         channels = df.columns
-        
+
+    # Создание массива времени    
     Ts = 1/fd
     t = []
     for i in range(raw_data.shape[1]):
@@ -360,7 +362,7 @@ def main(**kwargs):
         plt.tight_layout()
         plt.show()
 
-    # ВЫбор исследуемого периода/периодов
+    # Выбор исследуемого периода/периодов
     i = n_term
     if type(i) == list:
         print(f"Запрошен диапазон с {i[0]} по {i[1]} период включительно")
@@ -417,7 +419,6 @@ def main(**kwargs):
     # Интерактивное 3D отображение
     if plot_3D:
         fig = px.scatter_3d(df_term, x='x', y='y', z='z', size='size', size_max=10, opacity=1)
-        # tight layout
         fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
         fig.show()
 
