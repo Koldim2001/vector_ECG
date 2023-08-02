@@ -109,4 +109,4 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=3 --filt=True --f_sreza
 
 ```
 
-Пример работы кода можно наблюдать в jupiter notebook, доступном по ссылке - [utils/code_example.ipynb](https://nbviewer.org/github/Koldim2001/vector_ECG/blob/main/utils/code_example.ipynb)
+Пример работы кода можно наблюдать в jupiter notebook, доступном по ссылке - [utils/code_example.ipynb](https://nbviewer.org/github/Koldim2001/vector_ECG/blob/research/utils/code_example.ipynb)
