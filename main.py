@@ -8,6 +8,7 @@ from matplotlib.pyplot import figure
 import scipy.signal
 import neurokit2 as nk
 import plotly.express as px
+from shapely.geometry import Polygon
 import click
 
 
@@ -34,6 +35,90 @@ def discrete_signal_resample(signal, time, new_sampling_rate):
     return new_signal, new_time
 
 
+def calculate_area(points):
+    polygon = Polygon(points)
+    area_inside_loop = polygon.area
+    return area_inside_loop
+
+
+def loop(df_term, name, show=False):
+    DI = df_term['ECG I']
+    DII = df_term['ECG II']
+    V1 = df_term['ECG V1']
+    V2 = df_term['ECG V2']
+    V3 = df_term['ECG V3']
+    V4 = df_term['ECG V4']
+    V5 = df_term['ECG V5']
+    V6 = df_term['ECG V6']
+
+    df_term['x'] = -(-0.172*V1-0.074*V2+0.122*V3+0.231*V4+0.239*V5+0.194*V6+0.156*DI-0.01*DII)
+    df_term['y'] = (0.057*V1-0.019*V2-0.106*V3-0.022*V4+0.041*V5+0.048*V6-0.227*DI+0.887*DII)
+    df_term['z'] = -(-0.229*V1-0.31*V2-0.246*V3-0.063*V4+0.055*V5+0.108*V6+0.022*DI+0.102*DII)
+
+    if show:
+        plt.figure(figsize=(15, 5), dpi=80)
+        plt.subplot(1, 3, 1)
+        plt.plot(df_term.x,df_term.y)
+        plt.title('Фронтальная плоскость')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+
+        plt.subplot(1, 3, 2)
+        plt.plot(df_term.y,df_term.z)
+        plt.title('Сагитальная плоскость')
+        plt.xlabel('Y')
+        plt.ylabel('Z')
+
+        plt.subplot(1, 3, 3)
+        plt.plot(df_term.x, df_term.z)
+        plt.title('Аксиальная плоскость')  
+        plt.xlabel('X')
+        plt.ylabel('Z')
+
+        plt.suptitle(f'{name} петля', fontsize=16)
+        plt.show()
+    
+    points = list(zip(df_term['x'], df_term['y']))
+    area_inside_loop_1 = calculate_area(points)
+    print(f"Площадь петли {name} во фронтальной плоскости:", area_inside_loop_1)
+
+    points = list(zip(df_term['y'], df_term['z']))
+    area_inside_loop_2 = calculate_area(points)
+    print(f"Площадь петли {name} в сагитальной плоскости:", area_inside_loop_2)
+
+    points = list(zip(df_term['x'], df_term['z']))
+    area_inside_loop_3 = calculate_area(points)
+    print(f"Площадь петли {name} в аксиальной плоскости:", area_inside_loop_3)
+
+    return area_inside_loop_1, area_inside_loop_2, area_inside_loop_3
+
+
+def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
+    area = []
+    if QRS:
+        closest_Q_peak = min(waves_peak['ECG_Q_Peaks'], key=lambda x: abs(x - start))
+        closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
+        df_new = df.copy()
+        df_term = df_new.iloc[closest_Q_peak:closest_S_peak,:]
+        df_row = df_new.iloc[closest_Q_peak:closest_Q_peak+1,:]
+        df_term = pd.concat([df_term, df_row])
+
+        area = list(loop(df_term, name='QRS', show=show))
+
+    if T:
+        closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
+        closest_T_end = min(waves_peak['ECG_T_Offsets'], key=lambda x: abs(x - closest_S_peak))
+        df_new = df.copy()
+        df_term = df_new.iloc[closest_S_peak + int(0.025*Fs_new) : closest_T_end, :]
+        df_row = df_new.iloc[closest_S_peak+int(0.025*Fs_new):closest_S_peak+int(0.025*Fs_new)+1,:]
+        df_term = pd.concat([df_term, df_row])
+
+        area.extend(list(loop(df_term, name='T', show=show)))
+    return area
+
+
+
+#------------------------------------------ГЛАВНЫЙ КОД--------------------------------------#
 
 @click.command()
 @click.option(
@@ -102,6 +187,29 @@ def discrete_signal_resample(signal, time, new_sampling_rate):
     type=bool,
 )
 @click.option(
+    "--qrs_loop_area",
+    help="""Включение/выключение режима для расчета площади QRS петли по всем проекциям.
+    По умолчанию режим включен""",
+    default=True,
+    type=bool,
+)
+@click.option(
+    "--t_loop_area",
+    help="""Включение/выключение режима для расчета площади T петли по всем проекциям. 
+    (PS: Рассчет является менее точным, чем QRS петли из-за множественных самопересечений)
+    По умолчанию режим выключен""",
+    default=False,
+    type=bool,
+)
+@click.option(
+    "--show_log_loop_area",
+    help="""Включение/выключение режима для отображения отдельных петель. Доступен при
+    включенной опции расчета площади какой-либо петли QRS_loop_area или T_loop_area
+    По умолчанию режим выключен""",
+    default=False,
+    type=bool,
+)
+@click.option(
     "--save_images",
     help="""Включение/выключение режима для сохранения графиков вЭКГ трех
       плоскостей в качестве png изображений. Сохранение производится в папку saved_vECG,
@@ -141,12 +249,16 @@ def main(**kwargs):
     save_images = kwargs["save_images"]
     show_log_scaling = kwargs["show_log_scaling"]
     cancel_showing = kwargs["cancel_showing"]
+    QRS_loop_area = kwargs["qrs_loop_area"]
+    T_loop_area = kwargs["t_loop_area"]
+    show_log_loop_area = kwargs["show_log_loop_area"]
 
     if cancel_showing:
         show_detect_pqrst = False
         show_ECG = False
         plot_3D = False
         show_log_scaling = False
+        show_log_loop_area = False
 
     if n_term_finish != None:
         if n_term_finish < n_term_start:
@@ -156,6 +268,7 @@ def main(**kwargs):
     else:
         n_term = n_term_start
 
+    # Считывание edf данных:
     data = mne.io.read_raw_edf(data_edf, verbose=0)
     raw_data = data.get_data()
     info = data.info
@@ -173,7 +286,7 @@ def main(**kwargs):
     for i in range(raw_data.shape[1]):
         t.append(i*Ts)
 
-
+    # Ресемлинг:
     df_new = pd.DataFrame()
     for graph in channels:
         sig = np.array(df[graph])
@@ -181,6 +294,7 @@ def main(**kwargs):
         df_new[graph] = pd.Series(new_ecg) 
     df = df_new.copy()
 
+    # ФВЧ фильтрация артефактов дыхания:
     if filt == True:
         df_new = pd.DataFrame()
         for graph in channels:
@@ -192,11 +306,12 @@ def main(**kwargs):
             df_new[graph] = pd.Series(filtered)
         df = df_new.copy()
 
-    # Extract R-peaks locations and PQRST
+    # Поиск точек PQRST:
     signal = np.array(df['ECG I'])
     _, rpeaks = nk.ecg_peaks(signal, sampling_rate=Fs_new)
     _, waves_peak = nk.ecg_delineate(signal, rpeaks, sampling_rate=Fs_new, method="peak")
 
+    # Отображение PQST точек на сигнале первого отведения
     if show_detect_pqrst:
         plt.figure(figsize=(12, 5))
 
@@ -219,15 +334,12 @@ def main(**kwargs):
                             plt.axvline(x=time_new[int(peak)], linestyle='dotted', color='blue', label=f'{wave_type_label} Peak')
 
         plt.xlim([0, 6])
-        # Добавим подписи осей и заголовок графика
         plt.xlabel('Time (seconds)')
         plt.ylabel('Signal ECG I')
         plt.title('Детекция PQRST на 1 отведении')
-
-        # Отобразим график
         plt.show()
 
-
+    # Отображение многоканального ЭКГ с детекцией R зубцов
     if show_ECG:
         num_channels = len(channels)
         fig, axs = plt.subplots(int(num_channels/2), 2, figsize=(11, 8), sharex=True)
@@ -245,12 +357,10 @@ def main(**kwargs):
             axs[row, col].set_title(graph)
             axs[row, col].set_xlabel('Time (seconds)')
 
-        #plt.xlabel('Time (seconds)')
         plt.tight_layout()
         plt.show()
 
-
-    # Подсчет вЭКГ
+    # ВЫбор исследуемого периода/периодов
     i = n_term
     if type(i) == list:
         print(f"Запрошен диапазон с {i[0]} по {i[1]} период включительно")
@@ -275,12 +385,14 @@ def main(**kwargs):
     V5 = df_term['ECG V5']
     V6 = df_term['ECG V6']
 
+    # Расчет ВЭКГ
     df_term['x'] = -(-0.172*V1-0.074*V2+0.122*V3+0.231*V4+0.239*V5+0.194*V6+0.156*DI-0.01*DII)
     df_term['y'] = (0.057*V1-0.019*V2-0.106*V3-0.022*V4+0.041*V5+0.048*V6-0.227*DI+0.887*DII)
     df_term['z'] = -(-0.229*V1-0.31*V2-0.246*V3-0.063*V4+0.055*V5+0.108*V6+0.022*DI+0.102*DII)
 
     df_term['size'] = 100
 
+    # Построение проекций ВЭКГ:
     if not cancel_showing:
         plt.figure(figsize=(15, 5), dpi=100)
         plt.subplot(1, 3, 1)
@@ -302,13 +414,16 @@ def main(**kwargs):
         plt.ylabel('Z')
         plt.show()
 
+    # Интерактивное 3D отображение
     if plot_3D:
         fig = px.scatter_3d(df_term, x='x', y='y', z='z', size='size', size_max=10, opacity=1)
         # tight layout
         fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
         fig.show()
 
+    # Работа при указании одного периода ЭКГ: 
     if  n_term_finish == None or n_term_finish == n_term_start:
+        ## Масштабирование:
         # Поиск центра масс:
         x_center = df_term.x.mean()
         y_center = df_term.y.mean()
@@ -324,6 +439,7 @@ def main(**kwargs):
         df_term['y_scaled'] = df_term['y_scaled'] / max_value
         df_term['z_scaled'] = df_term['z_scaled'] / max_value
 
+        # Показ логов масштабирования
         if show_log_scaling:
             plt.figure(figsize=(8, 10), dpi=80)
             plt.subplot(3, 2, 1)
@@ -377,7 +493,11 @@ def main(**kwargs):
             plt.grid(True)
             plt.show()
 
+        # Поиск площадей при задании на исследование одного периодка ЭКГ:
+        area = get_area(show=show_log_loop_area, df=df, waves_peak=waves_peak,
+                         start=start, Fs_new=Fs_new,  QRS=QRS_loop_area, T=T_loop_area)
 
+    # Сохранение масштабированных изображений
     if save_images and (n_term_finish == None or n_term_finish == n_term_start):
         file_name_without_extension = os.path.splitext(os.path.basename(data_edf))[0]
         name = f'{file_name_without_extension}_period_{n_term_start}.png'

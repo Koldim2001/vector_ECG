@@ -19,6 +19,7 @@ setup(
         'scipy',
         'neurokit2',
         'plotly',
-        'click'
+        'click',
+        'shapely'
     ],
 )
