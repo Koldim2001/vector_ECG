@@ -1,4 +1,5 @@
 import mne
+import math
 import pandas as pd
 from matplotlib import pyplot as plt
 import numpy as np
@@ -143,9 +144,16 @@ def loop(df_term, name, show=False):
 def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
     # Выделяет области петель для дальнейшей обработки - подсчета угла QRST и площадей
     area = []
+    # Уберем nan:
+    waves_peak['ECG_Q_Peaks'] = [x for x in waves_peak['ECG_Q_Peaks'] if not math.isnan(x)]
+    waves_peak['ECG_S_Peaks'] = [x for x in waves_peak['ECG_S_Peaks'] if not math.isnan(x)]
+    waves_peak['ECG_T_Offsets'] = [x for x in waves_peak['ECG_T_Offsets'] if not math.isnan(x)]   
+
     # QRS петля
+    # Ищем ближний пик к R пику
     closest_Q_peak = min(waves_peak['ECG_Q_Peaks'], key=lambda x: abs(x - start))
     closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
+    print(closest_Q_peak, closest_S_peak)
     df_new = df.copy()
     df_term = df_new.iloc[closest_Q_peak:closest_S_peak,:]
     df_row = df_new.iloc[closest_Q_peak:closest_Q_peak+1,:]
@@ -155,8 +163,10 @@ def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
     if QRS:
         area = list(loop(df_term, name='QRS', show=show))
 
-    # ST-T петля
+    ## ST-T петля
+    # Ищем ближний пик к R пику
     closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
+    # Ищем ближний пик к S пику
     closest_T_end = min(waves_peak['ECG_T_Offsets'], key=lambda x: abs(x - closest_S_peak))
     df_new = df.copy()
     df_term = df_new.iloc[closest_S_peak + int(0.025*Fs_new) : closest_T_end, :]
@@ -471,6 +481,10 @@ def main(**kwargs):
     ## Поиск точек PQRST:
     n_otvedenie = 'I'
     signal = np.array(df['ECG I'])  
+    
+    # способ чистить сигнал перед поиском пиков:
+    #signal = nk.ecg_clean(signal, sampling_rate=Fs_new, method="neurokit") 
+
     # Поиск R зубцов:
     _, rpeaks = nk.ecg_peaks(signal, sampling_rate=Fs_new)
 
