@@ -1,4 +1,5 @@
 import mne
+import math
 import pandas as pd
 from matplotlib import pyplot as plt
 import numpy as np
@@ -11,6 +12,13 @@ import plotly.express as px
 from shapely.geometry import Polygon
 import plotly.graph_objects as go
 import click
+import warnings
+
+
+def convert_to_posix_path(windows_path):
+    # Перевод пути к формату posix:
+    posix_path = windows_path.replace('\\', '/')
+    return posix_path
 
 
 def rename_columns(df):
@@ -136,7 +144,13 @@ def loop(df_term, name, show=False):
 def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
     # Выделяет области петель для дальнейшей обработки - подсчета угла QRST и площадей
     area = []
+    # Уберем nan:
+    waves_peak['ECG_Q_Peaks'] = [x for x in waves_peak['ECG_Q_Peaks'] if not math.isnan(x)]
+    waves_peak['ECG_S_Peaks'] = [x for x in waves_peak['ECG_S_Peaks'] if not math.isnan(x)]
+    waves_peak['ECG_T_Offsets'] = [x for x in waves_peak['ECG_T_Offsets'] if not math.isnan(x)]   
+
     # QRS петля
+    # Ищем ближний пик к R пику
     closest_Q_peak = min(waves_peak['ECG_Q_Peaks'], key=lambda x: abs(x - start))
     closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
     df_new = df.copy()
@@ -148,8 +162,10 @@ def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
     if QRS:
         area = list(loop(df_term, name='QRS', show=show))
 
-    # ST-T петля
+    ## ST-T петля
+    # Ищем ближний пик к R пику
     closest_S_peak = min(waves_peak['ECG_S_Peaks'], key=lambda x: abs(x - start))
+    # Ищем ближний пик к S пику
     closest_T_end = min(waves_peak['ECG_T_Offsets'], key=lambda x: abs(x - closest_S_peak))
     df_new = df.copy()
     df_term = df_new.iloc[closest_S_peak + int(0.025*Fs_new) : closest_T_end, :]
@@ -166,7 +182,7 @@ def preprocessing_3d(list_coord):
     # Строит линии на 3D графике, отвечающие за вектора средних ЭДС петель
     A = np.array(list_coord)
 
-    step = 0.05
+    step = 0.025
     # Создаем массив точек от (0, 0, 0) до точки A с заданным шагом
     interpolated_points = []
     for t in np.arange(0, 1, step):
@@ -223,7 +239,6 @@ def angle_3d_plot(df1, df2, df3):
     fig.show()
 
 
-
 #---------------------------------------------------------------------#
 
 def process(input : dict):
@@ -250,6 +265,13 @@ def process(input : dict):
     angle_qrst = None
     angle_qrst_front = None
 
+    ## СЛЕДУЕТ УБРАТЬ ПРИ ТЕСТИРОВАНИИ:
+    # Устанавливаем фильтр для игнорирования всех RuntimeWarning
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+    # Включаем режим, позволяющий открывать графики сразу все
+    plt.ion()
+
     if cancel_showing:
         show_detect_pqrst = False
         show_ECG = False
@@ -265,6 +287,10 @@ def process(input : dict):
           n_term = [n_term_start, n_term_finish]  
     else:
         n_term = n_term_start
+
+    if '\\' in data_edf:
+        # Преобразуем путь в формат Posix
+        data_edf = convert_to_posix_path(data_edf)
 
     # Считывание edf данных:
     data = mne.io.read_raw_edf(data_edf, verbose=0)
@@ -305,13 +331,64 @@ def process(input : dict):
             filtered += avg
             df_new[graph] = pd.Series(filtered)
         df = df_new.copy()
+        
+    # ФНЧ фильтрация (по желанию можно включить):
+    filt_low_pass = False
+    if filt_low_pass:
+        df_new = pd.DataFrame()
+        for graph in channels:
+            sig = np.array(df[graph])
+            sos = scipy.signal.butter(1, 100, 'lp', fs=Fs_new, output='sos')
+            avg = np.mean(sig)
+            filtered = scipy.signal.sosfilt(sos, sig)
+            filtered += avg
+            df_new[graph] = pd.Series(filtered)
+        df = df_new.copy()
 
-    # Поиск точек PQRST:
-    signal = np.array(df['ECG I'])
+    ## Поиск точек PQRST:
+    n_otvedenie = 'I'
+    signal = np.array(df['ECG I'])  
+    
+    # способ чистить сигнал перед поиском пиков:
+    #signal = nk.ecg_clean(signal, sampling_rate=Fs_new, method="neurokit") 
+
+    # Поиск R зубцов:
     _, rpeaks = nk.ecg_peaks(signal, sampling_rate=Fs_new)
+
+    # Проверка в случае отсутствия результатов и повторная попытка:
+    if rpeaks['ECG_R_Peaks'].size == 0:
+        print("На I отведении не удалось детектировать R зубцы")
+        print("Проводим детектирование по II отведению:")
+        n_otvedenie = 'II'
+        signal = np.array(df['ECG II'])  
+        _, rpeaks = nk.ecg_peaks(signal, sampling_rate=Fs_new)
+        
+        # При повторной проблеме выход из функции:
+        if rpeaks['ECG_R_Peaks'].size == 0:
+            print('Сигналы ЭКГ слишком шумные для анализа')
+            # Отобразим эти шумные сигналы:
+            if not cancel_showing:
+                num_channels = len(channels)
+                fig, axs = plt.subplots(int(num_channels/2), 2, figsize=(11, 8), sharex=True)
+                for i, graph in enumerate(channels):
+                    row = i // 2
+                    col = i % 2
+                    sig = np.array(df[graph])
+                    axs[row, col].plot(time_new, sig)
+                    axs[row, col].set_title(graph)
+                    axs[row, col].set_xlim([0, 6])
+                    axs[row, col].set_title(graph)
+                    axs[row, col].set_xlabel('Time (seconds)')
+                plt.tight_layout()
+                plt.show()
+                plt.ioff()
+                plt.show()
+            return # Выход из функции досрочно
+
+    # Поиск точек pqst:
     _, waves_peak = nk.ecg_delineate(signal, rpeaks, sampling_rate=Fs_new, method="peak")
 
-    # Отображение PQST точек на сигнале первого отведения
+    # Отображение PQST точек на сигнале первого отведения (или второго при ошибке на первом)
     if show_detect_pqrst:
         plt.figure(figsize=(12, 5))
 
@@ -336,11 +413,10 @@ def process(input : dict):
                         else:  
                             plt.axvline(x=time_new[int(peak)], linestyle='dotted',
                                         color='blue', label=f'{wave_type_label} Peak')
-
-        plt.xlim([0, 6])
+        plt.xlim([0.5, 6])
         plt.xlabel('Time (seconds)')
         plt.ylabel('Signal ECG I')
-        plt.title('Детекция PQRST на 1 отведении')
+        plt.title(f'Детекция PQRST на {n_otvedenie} отведении')
         plt.show()
 
     # Отображение многоканального ЭКГ с детекцией R зубцов
@@ -376,6 +452,10 @@ def process(input : dict):
         fin = i
         beg = i
 
+    if beg-1 < 0 or fin >= len(rpeaks['ECG_R_Peaks']):
+        print('Запрашиваемого перода/диапазона периодов не существует')
+        return # Выход из функции досрочно
+    
     start = rpeaks['ECG_R_Peaks'][beg-1]
     end = rpeaks['ECG_R_Peaks'][fin]
     df_term = df.iloc[start:end,:]
@@ -548,6 +628,10 @@ def process(input : dict):
         plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
         plt.close()
         print('Фотографии сохранены в папке saved_vECG')
+
+    # Выключаем интерактивный режим, чтобы окна графиков не закрывались сразу
+    plt.ioff()
+    plt.show()
     return  area_projections, angle_qrst, angle_qrst_front
 
 
