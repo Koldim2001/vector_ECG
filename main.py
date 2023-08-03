@@ -454,6 +454,19 @@ def main(**kwargs):
             filtered += avg
             df_new[graph] = pd.Series(filtered)
         df = df_new.copy()
+        
+    # ФНЧ фильтрация (по желанию можно включить):
+    filt_low_pass = False
+    if filt_low_pass:
+        df_new = pd.DataFrame()
+        for graph in channels:
+            sig = np.array(df[graph])
+            sos = scipy.signal.butter(1, 100, 'lp', fs=Fs_new, output='sos')
+            avg = np.mean(sig)
+            filtered = scipy.signal.sosfilt(sos, sig)
+            filtered += avg
+            df_new[graph] = pd.Series(filtered)
+        df = df_new.copy()
 
     ## Поиск точек PQRST:
     n_otvedenie = 'I'
