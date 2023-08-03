@@ -11,6 +11,13 @@ import plotly.express as px
 from shapely.geometry import Polygon
 import plotly.graph_objects as go
 import click
+import warnings
+
+
+def convert_to_posix_path(windows_path):
+    # Перевод пути к формату posix:
+    posix_path = windows_path.replace('\\', '/')
+    return posix_path
 
 
 def rename_columns(df):
@@ -381,9 +388,13 @@ def main(**kwargs):
     count_qrst_angle = kwargs["count_qrst_angle"]
     show_log_qrst_angle = kwargs["show_log_qrst_angle"]
 
+    ## СЛЕДУЕТ УБРАТЬ ПРИ ТЕСТИРОВАНИИ:
+    # Устанавливаем фильтр для игнорирования всех RuntimeWarning
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
+
     # Включаем режим, позволяющий открывать графики сразу все
     plt.ion()
-    
+
     if cancel_showing:
         show_detect_pqrst = False
         show_ECG = False
@@ -399,6 +410,10 @@ def main(**kwargs):
           n_term = [n_term_start, n_term_finish]  
     else:
         n_term = n_term_start
+
+    if '\\' in data_edf:
+        # Преобразуем путь в формат Posix
+        data_edf = convert_to_posix_path(data_edf)
 
     # Считывание edf данных:
     data = mne.io.read_raw_edf(data_edf, verbose=0)
@@ -440,12 +455,46 @@ def main(**kwargs):
             df_new[graph] = pd.Series(filtered)
         df = df_new.copy()
 
-    # Поиск точек PQRST:
-    signal = np.array(df['ECG I'])
+    ## Поиск точек PQRST:
+    n_otvedenie = 'I'
+    signal = np.array(df['ECG I'])  
+    # Поиск R зубцов:
     _, rpeaks = nk.ecg_peaks(signal, sampling_rate=Fs_new)
+
+    # Проверка в случае отсутствия результатов и повторная попытка:
+    if rpeaks['ECG_R_Peaks'].size == 0:
+        print("На I отведении не удалось детектировать R зубцы")
+        print("Проводим детектирование по II отведению:")
+        n_otvedenie = 'II'
+        signal = np.array(df['ECG II'])  
+        _, rpeaks = nk.ecg_peaks(signal, sampling_rate=Fs_new)
+        
+        # При повторной проблеме выход из функции:
+        if rpeaks['ECG_R_Peaks'].size == 0:
+            print('Сигналы ЭКГ слишком шумные для анализа')
+            # Отобразим эти шумные сигналы:
+            if not cancel_showing:
+                num_channels = len(channels)
+                fig, axs = plt.subplots(int(num_channels/2), 2, figsize=(11, 8), sharex=True)
+                for i, graph in enumerate(channels):
+                    row = i // 2
+                    col = i % 2
+                    sig = np.array(df[graph])
+                    axs[row, col].plot(time_new, sig)
+                    axs[row, col].set_title(graph)
+                    axs[row, col].set_xlim([0, 6])
+                    axs[row, col].set_title(graph)
+                    axs[row, col].set_xlabel('Time (seconds)')
+                plt.tight_layout()
+                plt.show()
+                plt.ioff()
+                plt.show()
+            return # Выход из функции досрочно
+
+    # Поиск точек pqst:
     _, waves_peak = nk.ecg_delineate(signal, rpeaks, sampling_rate=Fs_new, method="peak")
 
-    # Отображение PQST точек на сигнале первого отведения
+    # Отображение PQST точек на сигнале первого отведения (или второго при ошибке на первом)
     if show_detect_pqrst:
         plt.figure(figsize=(12, 5))
 
@@ -470,11 +519,10 @@ def main(**kwargs):
                         else:  
                             plt.axvline(x=time_new[int(peak)], linestyle='dotted',
                                         color='blue', label=f'{wave_type_label} Peak')
-
-        plt.xlim([0, 6])
+        plt.xlim([0.5, 6])
         plt.xlabel('Time (seconds)')
         plt.ylabel('Signal ECG I')
-        plt.title('Детекция PQRST на 1 отведении')
+        plt.title(f'Детекция PQRST на {n_otvedenie} отведении')
         plt.show()
 
     # Отображение многоканального ЭКГ с детекцией R зубцов
@@ -510,6 +558,10 @@ def main(**kwargs):
         fin = i
         beg = i
 
+    if beg-1 < 0 or fin >= len(rpeaks['ECG_R_Peaks']):
+        print('Запрашиваемого перода/диапазона периодов не существует')
+        return # Выход из функции досрочно
+    
     start = rpeaks['ECG_R_Peaks'][beg-1]
     end = rpeaks['ECG_R_Peaks'][fin]
     df_term = df.iloc[start:end,:]
