@@ -381,6 +381,9 @@ def main(**kwargs):
     count_qrst_angle = kwargs["count_qrst_angle"]
     show_log_qrst_angle = kwargs["show_log_qrst_angle"]
 
+    # Включаем режим, позволяющий открывать графики сразу все
+    plt.ion()
+    
     if cancel_showing:
         show_detect_pqrst = False
         show_ECG = False
@@ -680,6 +683,9 @@ def main(**kwargs):
         plt.close()
         print('Фотографии сохранены в папке saved_vECG')
 
+    # Выключаем интерактивный режим, чтобы окна графиков не закрывались сразу
+    plt.ioff()
+    plt.show()
 
 if __name__ == "__main__":
     main()
