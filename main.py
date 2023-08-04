@@ -601,7 +601,7 @@ def main(**kwargs):
 
     # Построение проекций ВЭКГ:
     if not cancel_showing:
-        plt.figure(figsize=(15, 5), dpi=100)
+        plt.figure(figsize=(15, 5), dpi=90)
         plt.subplot(1, 3, 1)
         plt.plot(df_term.x,df_term.y)
         plt.title('Фронтальная плоскость')
