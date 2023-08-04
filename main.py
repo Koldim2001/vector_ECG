@@ -113,7 +113,7 @@ def loop(df_term, name, show=False):
 
         plt.subplot(1, 3, 2)
         plt.plot(df_term.y,df_term.z)
-        plt.title('Сагитальная плоскость')
+        plt.title('Сагиттальная плоскость')
         plt.xlabel('Y')
         plt.ylabel('Z')
 
@@ -132,7 +132,7 @@ def loop(df_term, name, show=False):
 
     points = list(zip(df_term['y'], df_term['z']))
     area_inside_loop_2 = calculate_area(points)
-    print(f"Площадь петли {name_loop} в сагитальной плоскости:", area_inside_loop_2)
+    print(f"Площадь петли {name_loop} в сагиттальной плоскости:", area_inside_loop_2)
 
     points = list(zip(df_term['x'], df_term['z']))
     area_inside_loop_3 = calculate_area(points)
@@ -610,7 +610,7 @@ def main(**kwargs):
 
         plt.subplot(1, 3, 2)
         plt.plot(df_term.y,df_term.z)
-        plt.title('Сагитальная плоскость')
+        plt.title('Сагиттальная плоскость')
         plt.xlabel('Y')
         plt.ylabel('Z')
 
