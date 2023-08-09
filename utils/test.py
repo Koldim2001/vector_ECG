@@ -350,21 +350,22 @@ def process(input : dict):
     signal = np.array(df['ECG I'])  
     
     # способ чистить сигнал перед поиском пиков:
-    #signal = nk.ecg_clean(signal, sampling_rate=Fs_new, method="neurokit") 
+    signal = nk.ecg_clean(signal, sampling_rate=Fs_new, method="neurokit") 
 
     # Поиск R зубцов:
     _, rpeaks = nk.ecg_peaks(signal, sampling_rate=Fs_new)
 
     # Проверка в случае отсутствия результатов и повторная попытка:
-    if rpeaks['ECG_R_Peaks'].size == 0:
+    if rpeaks['ECG_R_Peaks'].size <= 5:
         print("На I отведении не удалось детектировать R зубцы")
         print("Проводим детектирование по II отведению:")
         n_otvedenie = 'II'
         signal = np.array(df['ECG II'])  
+        signal = nk.ecg_clean(signal, sampling_rate=Fs_new, method="neurokit") 
         _, rpeaks = nk.ecg_peaks(signal, sampling_rate=Fs_new)
         
         # При повторной проблеме выход из функции:
-        if rpeaks['ECG_R_Peaks'].size == 0:
+        if rpeaks['ECG_R_Peaks'].size <= 3:
             print('Сигналы ЭКГ слишком шумные для анализа')
             # Отобразим эти шумные сигналы:
             if not cancel_showing:

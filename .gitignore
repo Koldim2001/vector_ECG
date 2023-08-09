@@ -4,3 +4,5 @@
 /saved_vECG
 /get_vECG.egg-info
 /get_VECG.egg-info
+/ecg_database
+/utils/analysis.ipynb
