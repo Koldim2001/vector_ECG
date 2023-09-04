@@ -239,6 +239,21 @@ def angle_3d_plot(df1, df2, df3):
     fig.show()
 
 
+def apply_filter_mean(column, window_size):
+    # Фильтр среднего для сглаживания петли ST-T
+    filtered_column = []
+
+    for i in range(len(column)):
+        if i < window_size // 2 or i >= len(column) - window_size // 2:
+            filtered_column.append(column[i])
+        else:
+            window = column[i - window_size // 2:i + window_size // 2 + 1]
+            filtered_value = np.mean(window)
+            filtered_column.append(filtered_value)
+
+    return filtered_column
+
+
 
 
 
@@ -377,6 +392,13 @@ def angle_3d_plot(df1, df2, df3):
     default=False,
     type=bool,
 )
+@click.option(
+    "--mean_filter",
+    help="""Включение/выключение фильтра среднего для ST-T петли чтобы сгладить
+    По умолчанию режим включен.""",
+    default=True,
+    type=bool,
+)
 def main(**kwargs):
     # ------------------ ARG parse ------------------
     data_edf = kwargs["data_edf"]
@@ -396,6 +418,7 @@ def main(**kwargs):
     show_log_loop_area = kwargs["show_log_loop_area"]
     count_qrst_angle = kwargs["count_qrst_angle"]
     show_log_qrst_angle = kwargs["show_log_qrst_angle"]
+    mean_filter = kwargs["mean_filter"]
 
     ## СЛЕДУЕТ УБРАТЬ ПРИ ТЕСТИРОВАНИИ:
     # Устанавливаем фильтр для игнорирования всех RuntimeWarning
@@ -599,6 +622,17 @@ def main(**kwargs):
     df_term = make_vecg(df_term)
     df_term['size'] = 100 # задание размера для 3D визуализации
 
+    if mean_filter:
+        df = make_vecg(df)
+        window = int(Fs_new * 0.02)
+        df['x'] = apply_filter_mean(np.array(df['x']), window)
+        df['y'] = apply_filter_mean(np.array(df['y']), window)
+        df['z'] = apply_filter_mean(np.array(df['z']), window)
+        df_term = df.iloc[start:end,:]
+        df_row = df.iloc[start:start+1,:]
+        df_term = pd.concat([df_term, df_row])
+        df_term['size'] = 100 
+        
     # Построение проекций ВЭКГ:
     if not cancel_showing:
         plt.figure(figsize=(15, 5), dpi=90)
