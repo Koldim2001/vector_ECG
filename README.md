@@ -6,7 +6,7 @@
 
 Подробный pdf отчет доступен по ссылке - [__ОТЧЕТ__](https://github.com/Koldim2001/vector_ECG/blob/main/utils/Отчет%20по%20проекту%20get_VECG.pdf) <br/>
 Видео туториал доступен по ссылке - [__get_VECG туториал__](https://youtu.be/t_-8pExz1gs)<br/>
-Презентация новых возможностей проекта - [__get_VECG_2.0__]()
+Презентация новых возможностей проекта - [__get_VECG_2.0__](https://youtu.be/8WBRQ-31ZdI)
 
 ## Installation:
 ```
