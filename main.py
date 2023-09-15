@@ -12,6 +12,9 @@ import plotly.express as px
 from shapely.geometry import Polygon
 import plotly.graph_objects as go
 import click
+import torch
+from torchvision import transforms
+from models_for_inference.model import *
 import warnings
 
 
@@ -399,6 +402,12 @@ def apply_filter_mean(column, window_size):
     default=True,
     type=bool,
 )
+@click.option(
+    "--predict",
+    help="""Включение/выключение СППР на основе PointNet""",
+    default=True,
+    type=bool,
+)
 def main(**kwargs):
     # ------------------ ARG parse ------------------
     data_edf = kwargs["data_edf"]
@@ -419,6 +428,7 @@ def main(**kwargs):
     count_qrst_angle = kwargs["count_qrst_angle"]
     show_log_qrst_angle = kwargs["show_log_qrst_angle"]
     mean_filter = kwargs["mean_filter"]
+    predict_res = kwargs["predict"]
 
     ## СЛЕДУЕТ УБРАТЬ ПРИ ТЕСТИРОВАНИИ:
     # Устанавливаем фильтр для игнорирования всех RuntimeWarning
@@ -734,6 +744,36 @@ def main(**kwargs):
             plt.ylim([-1.05, 1.05])
             plt.grid(True)
             plt.show()
+
+        # Инференс модели pointnet:
+        if predict_res:
+            point_cloud_array = df_term[['x', 'y', 'z']].values
+            val_transforms = transforms.Compose([
+                        Normalize(),
+                        PointSampler_weighted(512),
+                        ToTensor()
+                        ])
+            # Трансформация входных данных
+            inputs = val_transforms(point_cloud_array)
+            inputs = torch.unsqueeze(inputs, 0)
+            inputs = inputs.double()
+
+            pointnet = PointNet().double()
+            # Загрузка сохраненных весов модели
+            pointnet.load_state_dict(torch.load('models_for_inference/pointnet.pth'))
+            pointnet.eval().to('cpu')
+            with torch.no_grad():
+                outputs, __, __ = pointnet(inputs.transpose(1,2))
+
+                softmax_outputs = torch.softmax(outputs, dim=1)
+                probabilities, predicted_class = torch.max(softmax_outputs, 1)
+
+            if predicted_class == 0:
+                message = f'Здоров с вероятностью {probabilities.item() * 100:.2f}%'
+            else:
+                message = f'Болен с вероятностью {probabilities.item() * 100:.2f}%'
+            print(message)
+
 
         # Поиск площадей при задании на исследование одного периодка ЭКГ:
         area_projections , mean_qrs, mean_t = get_area(show=show_log_loop_area, df=df,
