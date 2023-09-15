@@ -33,6 +33,19 @@ def rename_columns(df):
     return df
 
 
+def discrete_signal_resample_for_DL(signal, old_sampling_rate, new_sampling_rate):
+    # Вычисляем коэффициент, определяющий отношение новой частоты к старой
+    resample_factor = new_sampling_rate / old_sampling_rate
+
+    # Количество точек в новой дискретизации
+    num_points_new = int(len(signal) * resample_factor)
+
+    # Используем scipy.signal.resample для изменения дискретизации
+    new_signal = scipy.signal.resample(signal, num_points_new)
+
+    return new_signal
+
+
 def discrete_signal_resample(signal, time, new_sampling_rate):
     ## Производит ресемплирование
     # Текущая частота дискретизации
@@ -745,15 +758,27 @@ def main(**kwargs):
             plt.grid(True)
             plt.show()
 
+        # СППР:
         # Инференс модели pointnet:
         if predict_res:
-            point_cloud_array = df_term[['x', 'y', 'z']].values
+            point_cloud_array_innitial = df_term[['x', 'y', 'z']].values
+            
+            # Приведем к дискретизации 700 Гц? на котором обучалась сеть
+            new_num_points = int(len(point_cloud_array_innitial) * 700 / Fs_new)
+
+            # Инициализируем новый массив
+            point_cloud_array = np.zeros((new_num_points, 3))
+
+            # Производим ресемплирование каждой координаты
+            for i in range(3):
+                point_cloud_array[:, i] = discrete_signal_resample_for_DL(point_cloud_array_innitial[:, i], Fs_new, 700)
+
+            # Трансформация входных данных
             val_transforms = transforms.Compose([
                         Normalize(),
                         PointSampler_weighted(512),
                         ToTensor()
                         ])
-            # Трансформация входных данных
             inputs = val_transforms(point_cloud_array)
             inputs = torch.unsqueeze(inputs, 0)
             inputs = inputs.double()
@@ -762,6 +787,7 @@ def main(**kwargs):
             # Загрузка сохраненных весов модели
             pointnet.load_state_dict(torch.load('models_for_inference/pointnet.pth'))
             pointnet.eval().to('cpu')
+            # инференс:
             with torch.no_grad():
                 outputs, __, __ = pointnet(inputs.transpose(1,2))
 
