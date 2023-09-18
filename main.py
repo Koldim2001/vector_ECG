@@ -173,7 +173,7 @@ def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
     df_term = df_new.iloc[closest_Q_peak:closest_S_peak,:]
     df_row = df_new.iloc[closest_Q_peak:closest_Q_peak+1,:]
     df_term = pd.concat([df_term, df_row])
-    df_term = make_vecg(df_term)
+    #df_term = make_vecg(df_term)
     mean_qrs = find_mean(df_term)
     if QRS:
         area = list(loop(df_term, name='QRS', show=show))
@@ -187,7 +187,7 @@ def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
     df_term = df_new.iloc[closest_S_peak + int(0.025*Fs_new) : closest_T_end, :]
     df_row = df_new.iloc[closest_S_peak+int(0.025*Fs_new):closest_S_peak+int(0.025*Fs_new)+1,:]
     df_term = pd.concat([df_term, df_row])
-    df_term = make_vecg(df_term)
+    #df_term = make_vecg(df_term)
     mean_t = find_mean(df_term)
     if T:
         area.extend(list(loop(df_term, name='T', show=show)))
@@ -643,6 +643,7 @@ def main(**kwargs):
 
     # Расчет ВЭКГ
     df_term = make_vecg(df_term)
+    df = make_vecg(df)
     df_term['size'] = 100 # задание размера для 3D визуализации
 
     if mean_filter:
@@ -763,7 +764,7 @@ def main(**kwargs):
         if predict_res:
             point_cloud_array_innitial = df_term[['x', 'y', 'z']].values
             
-            # Приведем к дискретизации 700 Гц? на котором обучалась сеть
+            # Приведем к дискретизации 700 Гц на котором обучалась сеть
             new_num_points = int(len(point_cloud_array_innitial) * 700 / Fs_new)
 
             # Инициализируем новый массив
