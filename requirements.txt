@@ -7,3 +7,5 @@ neurokit2
 plotly
 click
 shapely
+torch
+torchvision

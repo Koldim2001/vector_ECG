@@ -21,5 +21,7 @@ setup(
         'plotly',
         'click',
         'shapely'
+        'torch',
+        'torchvision'
     ],
 )

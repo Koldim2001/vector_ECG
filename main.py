@@ -12,6 +12,9 @@ import plotly.express as px
 from shapely.geometry import Polygon
 import plotly.graph_objects as go
 import click
+import torch
+from torchvision import transforms
+from models_for_inference.model import *
 import warnings
 
 
@@ -28,6 +31,19 @@ def rename_columns(df):
         new_columns.append(column[:-4])
     df.columns = new_columns
     return df
+
+
+def discrete_signal_resample_for_DL(signal, old_sampling_rate, new_sampling_rate):
+    # Вычисляем коэффициент, определяющий отношение новой частоты к старой
+    resample_factor = new_sampling_rate / old_sampling_rate
+
+    # Количество точек в новой дискретизации
+    num_points_new = int(len(signal) * resample_factor)
+
+    # Используем scipy.signal.resample для изменения дискретизации
+    new_signal = scipy.signal.resample(signal, num_points_new)
+
+    return new_signal
 
 
 def discrete_signal_resample(signal, time, new_sampling_rate):
@@ -157,7 +173,7 @@ def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
     df_term = df_new.iloc[closest_Q_peak:closest_S_peak,:]
     df_row = df_new.iloc[closest_Q_peak:closest_Q_peak+1,:]
     df_term = pd.concat([df_term, df_row])
-    df_term = make_vecg(df_term)
+    #df_term = make_vecg(df_term)
     mean_qrs = find_mean(df_term)
     if QRS:
         area = list(loop(df_term, name='QRS', show=show))
@@ -171,7 +187,7 @@ def get_area(show, df, waves_peak, start, Fs_new, QRS, T):
     df_term = df_new.iloc[closest_S_peak + int(0.025*Fs_new) : closest_T_end, :]
     df_row = df_new.iloc[closest_S_peak+int(0.025*Fs_new):closest_S_peak+int(0.025*Fs_new)+1,:]
     df_term = pd.concat([df_term, df_row])
-    df_term = make_vecg(df_term)
+    #df_term = make_vecg(df_term)
     mean_t = find_mean(df_term)
     if T:
         area.extend(list(loop(df_term, name='T', show=show)))
@@ -399,6 +415,12 @@ def apply_filter_mean(column, window_size):
     default=True,
     type=bool,
 )
+@click.option(
+    "--predict",
+    help="""Включение/выключение СППР на основе PointNet""",
+    default=True,
+    type=bool,
+)
 def main(**kwargs):
     # ------------------ ARG parse ------------------
     data_edf = kwargs["data_edf"]
@@ -419,6 +441,7 @@ def main(**kwargs):
     count_qrst_angle = kwargs["count_qrst_angle"]
     show_log_qrst_angle = kwargs["show_log_qrst_angle"]
     mean_filter = kwargs["mean_filter"]
+    predict_res = kwargs["predict"]
 
     ## СЛЕДУЕТ УБРАТЬ ПРИ ТЕСТИРОВАНИИ:
     # Устанавливаем фильтр для игнорирования всех RuntimeWarning
@@ -620,6 +643,7 @@ def main(**kwargs):
 
     # Расчет ВЭКГ
     df_term = make_vecg(df_term)
+    df = make_vecg(df)
     df_term['size'] = 100 # задание размера для 3D визуализации
 
     if mean_filter:
@@ -734,6 +758,49 @@ def main(**kwargs):
             plt.ylim([-1.05, 1.05])
             plt.grid(True)
             plt.show()
+
+        # СППР:
+        # Инференс модели pointnet:
+        if predict_res:
+            point_cloud_array_innitial = df_term[['x', 'y', 'z']].values
+            
+            # Приведем к дискретизации 700 Гц на котором обучалась сеть
+            new_num_points = int(len(point_cloud_array_innitial) * 700 / Fs_new)
+
+            # Инициализируем новый массив
+            point_cloud_array = np.zeros((new_num_points, 3))
+
+            # Производим ресемплирование каждой координаты
+            for i in range(3):
+                point_cloud_array[:, i] = discrete_signal_resample_for_DL(point_cloud_array_innitial[:, i], Fs_new, 700)
+
+            # Трансформация входных данных
+            val_transforms = transforms.Compose([
+                        Normalize(),
+                        PointSampler_weighted(512),
+                        ToTensor()
+                        ])
+            inputs = val_transforms(point_cloud_array)
+            inputs = torch.unsqueeze(inputs, 0)
+            inputs = inputs.double()
+
+            pointnet = PointNet().double()
+            # Загрузка сохраненных весов модели
+            pointnet.load_state_dict(torch.load('models_for_inference/pointnet.pth'))
+            pointnet.eval().to('cpu')
+            # инференс:
+            with torch.no_grad():
+                outputs, __, __ = pointnet(inputs.transpose(1,2))
+
+                softmax_outputs = torch.softmax(outputs, dim=1)
+                probabilities, predicted_class = torch.max(softmax_outputs, 1)
+
+            if predicted_class == 0:
+                message = f'Здоров с вероятностью {probabilities.item() * 100:.2f}%'
+            else:
+                message = f'Болен с вероятностью {probabilities.item() * 100:.2f}%'
+            print(message)
+
 
         # Поиск площадей при задании на исследование одного периодка ЭКГ:
         area_projections , mean_qrs, mean_t = get_area(show=show_log_loop_area, df=df,
