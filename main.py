@@ -35,6 +35,7 @@ def rename_columns(df):
 
 
 def discrete_signal_resample_for_DL(signal, old_sampling_rate, new_sampling_rate):
+    ## Производит ресемплирование для DL преподготовки
     # Вычисляем коэффициент, определяющий отношение новой частоты к старой
     resample_factor = new_sampling_rate / old_sampling_rate
 
@@ -121,24 +122,26 @@ def loop(df_term, name, show=False):
         name_loop = name
 
     if show:
-        plt.figure(figsize=(15, 5), dpi=80)
+        plt.figure(figsize=(29, 7), dpi=68)
         plt.subplot(1, 3, 1)
-        plt.plot(df_term.x,df_term.y)
+        plt.plot(df_term.y, df_term.z)
         plt.title('Фронтальная плоскость')
-        plt.xlabel('X')
-        plt.ylabel('Y')
-
-        plt.subplot(1, 3, 2)
-        plt.plot(df_term.y,df_term.z)
-        plt.title('Сагиттальная плоскость')
         plt.xlabel('Y')
         plt.ylabel('Z')
 
-        plt.subplot(1, 3, 3)
+        plt.subplot(1, 3, 2)
+        plt.gca().invert_xaxis()
         plt.plot(df_term.x, df_term.z)
-        plt.title('Аксиальная плоскость')  
+        plt.title('Сагиттальная плоскость')
         plt.xlabel('X')
         plt.ylabel('Z')
+
+        plt.subplot(1, 3, 3)
+        plt.plot(df_term.y, df_term.x)
+        plt.title('Аксиальная плоскость')  
+        plt.gca().invert_yaxis()
+        plt.xlabel('Y')
+        plt.ylabel('X')
 
         plt.suptitle(f'{name_loop} петля', fontsize=16)
         plt.show()
@@ -477,9 +480,9 @@ def main(**kwargs):
     info = data.info
     channels = data.ch_names
     fd = info['sfreq'] # Частота дискретизации
-    df = pd.DataFrame(data=raw_data.T,    # values
-                index=range(raw_data.shape[1]),  # 1st column as index
-                columns=channels)  # 1st row as the column names
+    df = pd.DataFrame(data=raw_data.T,    
+                index=range(raw_data.shape[1]),  
+                columns=channels) 
     # Переименование столбцов при необходимости:
     if 'ECG I-Ref' in df.columns:
         df = rename_columns(df)
@@ -660,24 +663,26 @@ def main(**kwargs):
         
     # Построение проекций ВЭКГ:
     if not cancel_showing:
-        plt.figure(figsize=(15, 5), dpi=90)
+        plt.figure(figsize=(29, 7), dpi=68)
         plt.subplot(1, 3, 1)
-        plt.plot(df_term.x,df_term.y)
+        plt.plot(df_term.y, df_term.z)
         plt.title('Фронтальная плоскость')
-        plt.xlabel('X')
-        plt.ylabel('Y')
-
-        plt.subplot(1, 3, 2)
-        plt.plot(df_term.y,df_term.z)
-        plt.title('Сагиттальная плоскость')
         plt.xlabel('Y')
         plt.ylabel('Z')
 
-        plt.subplot(1, 3, 3)
+        plt.subplot(1, 3, 2)
+        plt.gca().invert_xaxis()
         plt.plot(df_term.x, df_term.z)
-        plt.title('Аксиальная плоскость')  
+        plt.title('Сагиттальная плоскость')
         plt.xlabel('X')
         plt.ylabel('Z')
+
+        plt.subplot(1, 3, 3)
+        plt.plot(df_term.y, df_term.x)
+        plt.title('Аксиальная плоскость')  
+        plt.gca().invert_yaxis()
+        plt.xlabel('Y')
+        plt.ylabel('X')
         plt.show()
 
     # Интерактивное 3D отображение
