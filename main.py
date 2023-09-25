@@ -418,7 +418,7 @@ def apply_filter_mean(column, window_size):
 )
 @click.option(
     "--predict",
-    help="""Включение/выключение СППР на основе PointNet""",
+    help="""Включение/выключение СППР на основе PointNet и Resnet""",
     default=True,
     type=bool,
 )
@@ -797,14 +797,13 @@ def main(**kwargs):
                 probabilities, predicted_class = torch.max(softmax_outputs, 1)
 
             if predicted_class == 0:
-                message = f'Здоров (уверенность PointNet {probabilities.item() * 100:.2f})%'
+                message = f'Здоров (уверенность PointNet {probabilities.item() * 100:.2f}%)'
             else:
-                message = f'Болен (уверенность PointNet {probabilities.item() * 100:.2f})%'
+                message = f'Болен (уверенность PointNet {probabilities.item() * 100:.2f}%)'
             print(message)
 
 
             # Инференс ResNet
-
             file_name_without_extension = os.path.splitext(os.path.basename(data_edf))[0]
             name = '.png'
             
@@ -868,11 +867,11 @@ def main(**kwargs):
                 probabilities, predicted_class = torch.max(softmax_outputs, 1)
 
             if predicted_class == 0:
-                message = f'Здоров (уверенность ResNet {probabilities.item() * 100:.2f})%'
+                message = f'Здоров (уверенность ResNet {probabilities.item() * 100:.2f}%)'
             else:
-                message = f'Болен (уверенность ResNet {probabilities.item() * 100:.2f})%'
+                message = f'Болен (уверенность ResNet {probabilities.item() * 100:.2f}%)'
             print(message)
-            #os.remove('combined.png')
+            os.remove('combined.png')
             os.remove('XY_plane.png')
             os.remove('XZ_plane.png')
             os.remove('YZ_plane.png')
