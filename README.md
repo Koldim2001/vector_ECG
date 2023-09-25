@@ -34,11 +34,11 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=2 --n_term_finish=6 --f
 
 Задание одного периода ЭКГ для обработки и сохранения результатов ВЭКГ в виде png файлов масштабированных проекций:
 ```
-get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=3 --filt=True --f_sreza=0.5 --f_sampling=2500 --show_detected_pqrst=False --show_ecg=False --plot_3d=False --qrs_loop_area=False --t_loop_area=False --show_log_loop_area=False --count_qrst_angle=False --show_log_qrst_angle=False --save_images=True --show_log_scaling=True --mean_filter=False
+get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=3 --filt=True --f_sreza=0.5 --f_sampling=2500 --show_detected_pqrst=False --show_ecg=False --plot_3d=False --qrs_loop_area=False --t_loop_area=False --show_log_loop_area=False --count_qrst_angle=False --show_log_qrst_angle=False --save_images=True --show_log_scaling=True --mean_filter=False --predict=False
 ```
 Задание одного периода ЭКГ для обработки c выводом всех логов и найденных углов с площадями:
 ```
-get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=3 --filt=True --f_sreza=0.5 --f_sampling=2500 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --qrs_loop_area=True --t_loop_area=True --show_log_loop_area=True --save_images=False --show_log_scaling=True --count_qrst_angle=True --show_log_qrst_angle=True --mean_filter=False
+get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=3 --filt=True --f_sreza=0.5 --f_sampling=2500 --show_detected_pqrst=True --show_ecg=True --plot_3d=True --qrs_loop_area=True --t_loop_area=True --show_log_loop_area=True --save_images=False --show_log_scaling=True --count_qrst_angle=True --show_log_qrst_angle=True --mean_filter=False --predict=True
 ```
 
 Список параметров с пояснениями, которые можно передать на вход программы перед ее запуском в cli:
@@ -115,5 +115,3 @@ get_VECG --data_edf="Data_VECG\ECG_1.edf" --n_term_start=3 --filt=True --f_sreza
 --help                         Покажет существующие варианты парсинга аргументов в CLI
 
 ```
-
-Пример работы кода можно наблюдать в jupiter notebook, доступном по ссылке - [utils/code_example.ipynb](https://nbviewer.org/github/Koldim2001/vector_ECG/blob/research/utils/code_example.ipynb)
