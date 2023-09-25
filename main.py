@@ -13,6 +13,7 @@ from shapely.geometry import Polygon
 import plotly.graph_objects as go
 import click
 import torch
+from PIL import Image
 from torchvision import transforms
 from models_for_inference.model import *
 import warnings
@@ -796,10 +797,86 @@ def main(**kwargs):
                 probabilities, predicted_class = torch.max(softmax_outputs, 1)
 
             if predicted_class == 0:
-                message = f'Здоров с вероятностью {probabilities.item() * 100:.2f}%'
+                message = f'Здоров (уверенность PointNet {probabilities.item() * 100:.2f})%'
             else:
-                message = f'Болен с вероятностью {probabilities.item() * 100:.2f}%'
+                message = f'Болен (уверенность PointNet {probabilities.item() * 100:.2f})%'
             print(message)
+
+
+            # Инференс ResNet
+
+            file_name_without_extension = os.path.splitext(os.path.basename(data_edf))[0]
+            name = '.png'
+            
+            # После каждого plt.show() добавим код для сохранения графика в ЧБ формате
+            plt.figure(figsize=(7, 7), dpi=150)
+            plt.xlim([-1.03, 1.03])
+            plt.ylim([-1.03, 1.03])
+            plt.plot(df_term.x_scaled, df_term.y_scaled, color='black')
+            plt.axis('off')  # Отключить оси и подписи
+            name_save = 'XY_plane' + name
+            plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
+            plt.close()
+
+            plt.figure(figsize=(7, 7), dpi=150)
+            plt.xlim([-1.03, 1.03])
+            plt.ylim([-1.03, 1.03])
+            plt.plot(df_term.y_scaled, df_term.z_scaled, color='black')
+            plt.axis('off')  # Отключить оси и подписи
+            name_save = 'YZ_plane' + name
+            plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
+            plt.close()
+
+            plt.figure(figsize=(7, 7), dpi=150)
+            plt.xlim([-1.03, 1.03])
+            plt.ylim([-1.03, 1.03])  
+            plt.plot(df_term.x_scaled, df_term.z_scaled, color='black')
+            plt.axis('off')  # Отключить оси и подписи
+            name_save = 'XZ_plane' + name
+            plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
+            plt.close()
+            
+            r_image = Image.open('XZ_plane' + name).convert("L")
+            g_image = Image.open('XY_plane' + name).convert("L")
+            b_image = Image.open('YZ_plane' + name).convert("L")
+
+            # Создайте цветное изображение RGB
+            color_image = Image.merge('RGB', (r_image, g_image, b_image))
+
+            # Сохраните цветное изображение в новой папке
+            color_image.save('combined.png')
+
+            # Загрузка сохраненной модели
+            model = torch.jit.load("models_for_inference/resnet.pt").to('cpu').eval()
+
+            # Задаем преобразования: изменение размера, нормализация и преобразование в тензор
+            transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+            ])
+
+            # Загрузка изображения
+            image = Image.open('combined.png').convert("RGB")
+
+            # Применение преобразований
+            input_tensor = transform(image).unsqueeze(0).to('cpu')  # Добавляем размерность пакета
+
+            # Пропуск изображения через модель
+            with torch.no_grad():
+                outputs = model(input_tensor)
+                softmax_outputs = torch.softmax(outputs, dim=1)
+                probabilities, predicted_class = torch.max(softmax_outputs, 1)
+
+            if predicted_class == 0:
+                message = f'Здоров (уверенность ResNet {probabilities.item() * 100:.2f})%'
+            else:
+                message = f'Болен (уверенность ResNet {probabilities.item() * 100:.2f})%'
+            print(message)
+            #os.remove('combined.png')
+            os.remove('XY_plane.png')
+            os.remove('XZ_plane.png')
+            os.remove('YZ_plane.png')
+
 
 
         # Поиск площадей при задании на исследование одного периодка ЭКГ:
@@ -827,12 +904,12 @@ def main(**kwargs):
         # Создадим папки для записи если их еще нет:
         if not os.path.exists('saved_vECG'):
             os.makedirs('saved_vECG')
-        if not os.path.exists('saved_vECG/frontal_plane'):
-            os.makedirs('saved_vECG/frontal_plane')
-        if not os.path.exists('saved_vECG/sagittal_plane'):
-            os.makedirs('saved_vECG/sagittal_plane')
-        if not os.path.exists('saved_vECG/axial_plane'):
-            os.makedirs('saved_vECG/axial_plane')      
+        if not os.path.exists('saved_vECG/XY_plane'):
+            os.makedirs('saved_vECG/XY_plane')
+        if not os.path.exists('saved_vECG/YZ_plane'):
+            os.makedirs('saved_vECG/YZ_plane')
+        if not os.path.exists('saved_vECG/XZ_plane'):
+            os.makedirs('saved_vECG/XZ_plane')      
 
         # После каждого plt.show() добавим код для сохранения графика в ЧБ формате
         plt.figure(figsize=(7, 7), dpi=150)
@@ -840,7 +917,7 @@ def main(**kwargs):
         plt.ylim([-1.03, 1.03])
         plt.plot(df_term.x_scaled, df_term.y_scaled, color='black')
         plt.axis('off')  # Отключить оси и подписи
-        name_save = 'saved_vECG/frontal_plane/' + name
+        name_save = 'saved_vECG/XY_plane/' + name
         plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
         plt.close()
 
@@ -849,7 +926,7 @@ def main(**kwargs):
         plt.ylim([-1.03, 1.03])
         plt.plot(df_term.y_scaled, df_term.z_scaled, color='black')
         plt.axis('off')  # Отключить оси и подписи
-        name_save = 'saved_vECG/sagittal_plane/' + name
+        name_save = 'saved_vECG/YZ_plane/' + name
         plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
         plt.close()
 
@@ -858,7 +935,7 @@ def main(**kwargs):
         plt.ylim([-1.03, 1.03])  
         plt.plot(df_term.x_scaled, df_term.z_scaled, color='black')
         plt.axis('off')  # Отключить оси и подписи
-        name_save = 'saved_vECG/axial_plane/' + name
+        name_save = 'saved_vECG/XZ_plane/' + name
         plt.savefig(name_save, bbox_inches='tight', pad_inches=0, transparent=True, facecolor='white')
         plt.close()
         print('Фотографии сохранены в папке saved_vECG')
